@@ -2,6 +2,7 @@ package pathways
 
 import "core:fmt"
 import "core:mem"
+// import "core:os"
 import rl "vendor:raylib"
 
 WINDOW_WIDTH :: 1920
@@ -33,6 +34,7 @@ Grid :: struct {
 
 input: Input
 grid: Grid
+path: [][2]i32
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -96,6 +98,23 @@ setup :: proc() {
 			}
 		}
 	}
+
+	path = gen_path({0, 0}, 6, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	for p in path {
+		hash := gen_hash(p.x, p.y)
+		grid.tiles[hash] = Tile {
+			pos_grid = {p.x, p.y},
+			pos_px   = {
+				f32(p.x) * TILE_SIZE + tile_x_offset,
+				f32(p.y) * TILE_SIZE + tile_y_offset,
+				TILE_SIZE,
+				TILE_SIZE,
+			},
+		}
+	}
+
+	// fmt.printfln("%v", path)
+	// os.exit(0)
 }
 
 update :: proc() {
@@ -131,11 +150,15 @@ render :: proc() {
 	}
 
 	draw_ui()
+	draw_debug_ui()
 
 	rl.EndDrawing()
 }
 
 draw_ui :: proc() {
+}
+
+draw_debug_ui :: proc() {
 	rl.DrawRectangleLinesEx(grid.pos_px, 1, rl.BLACK)
 	x, y := get_mouse_grid_pos()
 	rl.DrawText(
@@ -145,6 +168,17 @@ draw_ui :: proc() {
 		20,
 		rl.BLACK,
 	)
+
+	i := 0
+	tile_x_offset: i32 = TILE_LEFT_OFFSET * TILE_SIZE
+	tile_y_offset: i32 = TILE_TOP_OFFSET * TILE_SIZE
+	for t in path {
+		x := t.x * TILE_SIZE + tile_x_offset
+		y := t.y * TILE_SIZE + tile_y_offset
+		rl.DrawRectangleLines(x, y, TILE_SIZE, TILE_SIZE, rl.PINK)
+		rl.DrawText(fmt.ctprint(i), x, y, 25, rl.BLACK)
+		i += 1
+	}
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
