@@ -9,22 +9,28 @@ Direction :: enum {
 	DOWN,
 	LEFT,
 }
-directions := [4][2]i32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 
 gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 	path := make([][2]i32, path_len)
 	path[0] = start_pos
 
 	for i in 1 ..< path_len {
+		directions := [4][2]i32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+		tried_directions: map[Direction][2]i32
+
 		prev_tile := path[i - 1]
 		try_dir := rand.choice_enum(Direction)
+		tried_directions[try_dir] = directions[try_dir]
 		try_pos := prev_tile + directions[try_dir]
 
-		// TODO:(lukefilewalker) pop the random choice off a list instead to avoid repeat guesses
-		// of a choice that won't work
 		for !is_direction_valid(&path, try_pos, try_dir) {
 			try_dir = rand.choice_enum(Direction)
+			tried_directions[try_dir] = directions[try_dir]
 			try_pos = prev_tile + directions[try_dir]
+
+			if len(tried_directions) == 4 {
+				directions = [4][2]i32{{0, -2}, {2, 0}, {0, 2}, {-2, 0}}
+			}
 		}
 
 		path[i] = try_pos
