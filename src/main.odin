@@ -10,7 +10,9 @@ WINDOW_HEIGHT :: 1088
 NUM_TILES_IN_WIN_ROW :: 30
 NUM_TILES_IN_WIN_COL :: 17
 
-TILE_SIZE :: 64
+SCALE :: 2
+SRC_TILE_SIZE :: 32
+TILE_SIZE :: SRC_TILE_SIZE * SCALE
 TILE_TOP_OFFSET :: 1
 TILE_BOTTOM_OFFSET :: 1
 TILE_LEFT_OFFSET :: 1
@@ -21,6 +23,7 @@ NUM_TILES_IN_COL: i32 : NUM_TILES_IN_WIN_COL - TILE_TOP_OFFSET - TILE_BOTTOM_OFF
 Tile :: struct {
 	pos_grid: []i32,
 	pos_px:   rl.Rectangle,
+	src_px:   rl.Rectangle,
 	colour:   rl.Color,
 }
 
@@ -29,9 +32,25 @@ Grid :: struct {
 	tiles:  map[u16]Tile,
 }
 
+TileType :: enum {
+	HORIZONTAL,
+	VERTICAL,
+	CROSSING,
+	RIGHT_TO_UP,
+	RIGHT_TO_DOWN,
+	LEFT_TO_UP,
+	LEFT_TO_DOWN,
+	UP_TO_RIGHT,
+	UP_TO_LEFT,
+	DOWN_TO_RIGHT,
+	DOWN_TO_LEFT,
+}
+
 input: Input
 grid: Grid
 path: [][2]i32
+tileset: rl.Texture2D
+tiles: map[TileType]rl.Rectangle
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -96,22 +115,148 @@ setup :: proc() {
 		}
 	}
 
-	path = gen_path({0, 0}, 15, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
-	for p in path {
-		hash := gen_hash(p.x, p.y)
+	ts: [4][4]rl.Rectangle
+	ts[int(Direction.RIGHT)][int(Direction.RIGHT)] = {0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
+	ts[int(Direction.RIGHT)][int(Direction.UP)] = {
+		3 * SRC_TILE_SIZE,
+		0,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.RIGHT)][int(Direction.DOWN)] = {
+		2 * SRC_TILE_SIZE,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.LEFT)][int(Direction.LEFT)] = {0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
+	ts[int(Direction.LEFT)][int(Direction.UP)] = {
+		1 * SRC_TILE_SIZE,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.LEFT)][int(Direction.DOWN)] = {
+		0,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.UP)][int(Direction.LEFT)] = {
+		2 * SRC_TILE_SIZE,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.UP)][int(Direction.UP)] = {1 * SRC_TILE_SIZE, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
+	ts[int(Direction.UP)][int(Direction.RIGHT)] = {
+		0,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.DOWN)][int(Direction.LEFT)] = {
+		3 * SRC_TILE_SIZE,
+		0,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.DOWN)][int(Direction.DOWN)] = {
+		1 * SRC_TILE_SIZE,
+		0,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+	ts[int(Direction.DOWN)][int(Direction.RIGHT)] = {
+		1 * SRC_TILE_SIZE,
+		1 * SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+		SRC_TILE_SIZE,
+	}
+
+	fmt.printfln("%v", ts)
+
+	path = gen_path({0, 0}, 30, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
+
+	for i in 0 ..< len(path) {
+		this_tile := path[i]
+
+		// Lookup first tile
+		if i == 0 {
+			prev := path[i + 1]
+			next := path[i + 1]
+			off_tile_dir := next - this_tile
+			if off_tile_dir == {0, 1} {
+				src_px = ts[Direction.DOWN][Direction.DOWN]
+			} else if off_tile_dir == {1, 0} {
+				src_px = ts[Direction.RIGHT][Direction.RIGHT]
+			}
+		}
+
+		// Lookup the middle tiles
+		if i > 0 && i < len(path) - 1 {
+			prev := path[i - 1]
+			next := path[i + 1]
+			on_tile_dir_key, off_tile_dir_key := lookup_tile(prev, this_tile, next)
+			src_px = ts[on_tile_dir_key][off_tile_dir_key]
+		}
+
+		// Lookup last tile
+		if i == len(path) - 1 {
+			prev := path[i - 1]
+			// TODO:(lukefilewalker) this will be the village location
+			next := [2]i32{1, 0}
+			on_tile_dir_key, off_tile_dir_key := lookup_tile(prev, this_tile, next)
+			src_px = ts[on_tile_dir_key][off_tile_dir_key]
+		}
+
+		hash := gen_hash(this_tile.x, this_tile.y)
 		grid.tiles[hash] = Tile {
-			pos_grid = {p.x, p.y},
+			pos_grid = {this_tile.x, this_tile.y},
 			pos_px   = {
-				f32(p.x) * TILE_SIZE + tile_x_offset,
-				f32(p.y) * TILE_SIZE + tile_y_offset,
+				f32(this_tile.x) * TILE_SIZE + tile_x_offset,
+				f32(this_tile.y) * TILE_SIZE + tile_y_offset,
 				TILE_SIZE,
 				TILE_SIZE,
 			},
+			src_px   = src_px,
 		}
 	}
 
+	tileset = rl.LoadTexture("res/tileset.png")
+
 	// fmt.printfln("%v", path)
 	// os.exit(0)
+}
+
+lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
+	on_tile_dir := this_tile - prev
+	off_tile_dir := next - this_tile
+
+	on_tile_dir_key: Direction
+	if on_tile_dir == {1, 0} || on_tile_dir == {2, 0} {
+		on_tile_dir_key = .RIGHT
+	} else if on_tile_dir == {-1, 0} || on_tile_dir == {-2, 0} {
+		on_tile_dir_key = .LEFT
+	} else if on_tile_dir == {0, 1} || on_tile_dir == {0, 2} {
+		on_tile_dir_key = .DOWN
+	} else if on_tile_dir == {0, -1} || on_tile_dir == {0, -2} {
+		on_tile_dir_key = .UP
+	}
+
+	off_tile_dir_key: Direction
+	if off_tile_dir == {1, 0} || off_tile_dir == {2, 0} {
+		off_tile_dir_key = .RIGHT
+	} else if off_tile_dir == {-1, 0} || off_tile_dir == {-2, 0} {
+		off_tile_dir_key = .LEFT
+	} else if off_tile_dir == {0, 1} || off_tile_dir == {0, 2} {
+		off_tile_dir_key = .DOWN
+	} else if off_tile_dir == {0, -1} || off_tile_dir == {0, -2} {
+		off_tile_dir_key = .UP
+	}
+
+	return on_tile_dir_key, off_tile_dir_key
 }
 
 update :: proc() {
@@ -141,8 +286,10 @@ render :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.LIGHTGRAY)
 
+	src: rl.Rectangle
 	for _, t in grid.tiles {
-		rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+		// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+		rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
 		rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
 	}
 

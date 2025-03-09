@@ -36,8 +36,6 @@ gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 		path[i] = try_pos
 	}
 
-	fmt.printfln("path:%v\n", path)
-
 	return path
 }
 
