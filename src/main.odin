@@ -19,10 +19,7 @@ NUM_TILES_IN_ROW: i32 : NUM_TILES_IN_WIN_ROW - TILE_LEFT_OFFSET - TILE_RIGHT_OFF
 NUM_TILES_IN_COL: i32 : NUM_TILES_IN_WIN_COL - TILE_TOP_OFFSET - TILE_BOTTOM_OFFSET
 
 Tile :: struct {
-	pos_grid: struct {
-		x: i32,
-		y: i32,
-	},
+	pos_grid: []i32,
 	pos_px:   rl.Rectangle,
 	colour:   rl.Color,
 }
@@ -87,7 +84,7 @@ setup :: proc() {
 			hash := gen_hash(x, y)
 
 			grid.tiles[hash] = Tile {
-				pos_grid = {x = x, y = y},
+				pos_grid = {x, y},
 				pos_px = rl.Rectangle {
 					x = f32(x) * TILE_SIZE + tile_x_offset,
 					y = f32(y) * TILE_SIZE + tile_y_offset,
@@ -99,7 +96,7 @@ setup :: proc() {
 		}
 	}
 
-	path = gen_path({0, 0}, 6, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path = gen_path({0, 0}, 15, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	for p in path {
 		hash := gen_hash(p.x, p.y)
 		grid.tiles[hash] = Tile {
