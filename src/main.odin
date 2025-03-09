@@ -50,6 +50,7 @@ input: Input
 grid: Grid
 path: [][2]i32
 tileset: rl.Texture2D
+ui_tileset: rl.Texture2D
 tiles: map[TileType]rl.Rectangle
 
 main :: proc() {
@@ -225,6 +226,7 @@ setup :: proc() {
 	}
 
 	tileset = rl.LoadTexture("res/tileset.png")
+	ui_tileset = rl.LoadTexture("res/ui.png")
 
 	// fmt.printfln("%v", path)
 	// os.exit(0)
@@ -260,8 +262,9 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 }
 
 update :: proc() {
+	if ui_update() do return
+
 	update_grid()
-	update_ui()
 }
 
 update_grid :: proc() {
@@ -278,8 +281,8 @@ update_grid :: proc() {
 	}
 }
 
-update_ui :: proc() {
-
+ui_update :: proc() -> bool {
+	return false
 }
 
 render :: proc() {
@@ -293,13 +296,21 @@ render :: proc() {
 		rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
 	}
 
-	draw_ui()
+	ui_draw()
 	draw_debug_ui()
 
 	rl.EndDrawing()
 }
 
-draw_ui :: proc() {
+ui_draw :: proc() {
+	rl.DrawTexturePro(
+		ui_tileset,
+		{0, 0, 32 * 4, 32 * 3},
+		{10, WINDOW_HEIGHT - 32 * 3 * 2 - 64 - 10, 32 * 4 * 2, 32 * 3 * 2},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
 }
 
 draw_debug_ui :: proc() {
