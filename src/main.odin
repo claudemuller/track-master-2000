@@ -50,7 +50,6 @@ input: Input
 grid: Grid
 path: [][2]i32
 tileset: rl.Texture2D
-ui_tileset: rl.Texture2D
 tiles: map[TileType]rl.Rectangle
 
 main :: proc() {
@@ -226,10 +225,140 @@ setup :: proc() {
 	}
 
 	tileset = rl.LoadTexture("res/tileset.png")
-	ui_tileset = rl.LoadTexture("res/ui.png")
+
+	ui_setup()
 
 	// fmt.printfln("%v", path)
 	// os.exit(0)
+}
+
+update :: proc() {
+	if ui_update() do return
+
+	update_grid()
+}
+
+render :: proc() {
+	rl.BeginDrawing()
+	rl.ClearBackground(rl.LIGHTGRAY)
+
+	draw_background_ui()
+
+	src: rl.Rectangle
+	for _, t in grid.tiles {
+		// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+		rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+		rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
+	}
+
+	ui_draw()
+	// draw_debug_ui()
+
+	rl.EndDrawing()
+}
+
+update_grid :: proc() {
+	if !rl.CheckCollisionPointRec(input.mouse.pos_px, grid.pos_px) {
+		return
+	}
+
+	if .LEFT in input.mouse.btns {
+		x, y := get_mouse_grid_pos()
+		hash := gen_hash(x, y)
+
+		t := &grid.tiles[hash]
+		t.colour = rl.RED
+	}
+}
+
+draw_background_ui :: proc() {
+	// Top bar
+	rl.DrawTexturePro(ui_tileset, {0, 0, 19, 19}, {0, 0, 28, 28}, {0, 0}, 0, rl.WHITE)
+	rl.DrawTexturePro(
+		ui_tileset,
+		{19 * 1, 0, 19, 19},
+		{1 * 28, 0, WINDOW_WIDTH - 28 * 2, 28},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+	rl.DrawTexturePro(
+		ui_tileset,
+		{19 * 2, 0, 19, 19},
+		{WINDOW_WIDTH - 28, 0, 28, 28},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+
+	// Left border
+	rl.DrawTexturePro(
+		ui_tileset,
+		{0, 19, 19, 19},
+		{0, 1 * 28, 28, WINDOW_HEIGHT - 28 * 2},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+
+	// Right border
+	rl.DrawTexturePro(
+		ui_tileset,
+		{19 * 2, 19, 19, 19},
+		{WINDOW_WIDTH - 28, 1 * 28, 28, WINDOW_HEIGHT - 28 * 2},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+
+	// Bottom
+	rl.DrawTexturePro(
+		ui_tileset,
+		{0, 19 * 2, 19, 19},
+		{0, WINDOW_HEIGHT - 28, 28, 28},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+	rl.DrawTexturePro(
+		ui_tileset,
+		{19, 19 * 2, 19, 19},
+		{1 * 28, WINDOW_HEIGHT - 28, WINDOW_WIDTH - 28 * 2, 28},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+	rl.DrawTexturePro(
+		ui_tileset,
+		{19 * 2, 19 * 2, 19, 19},
+		{WINDOW_WIDTH - 28, WINDOW_HEIGHT - 28, 28, 28},
+		{0, 0},
+		0,
+		rl.WHITE,
+	)
+}
+
+draw_debug_ui :: proc() {
+	rl.DrawRectangleLinesEx(grid.pos_px, 1, rl.BLACK)
+	x, y := get_mouse_grid_pos()
+	rl.DrawText(
+		fmt.ctprintf("%v [%v] %v [%v]", x, NUM_TILES_IN_ROW, y, NUM_TILES_IN_COL),
+		10,
+		10,
+		20,
+		rl.BLACK,
+	)
+
+	i := 0
+	tile_x_offset: i32 = TILE_LEFT_OFFSET * TILE_SIZE
+	tile_y_offset: i32 = TILE_TOP_OFFSET * TILE_SIZE
+	for t in path {
+		x := t.x * TILE_SIZE + tile_x_offset
+		y := t.y * TILE_SIZE + tile_y_offset
+		rl.DrawRectangleLines(x, y, TILE_SIZE, TILE_SIZE, rl.PINK)
+		rl.DrawText(fmt.ctprint(i), x, y, 25, rl.BLACK)
+		i += 1
+	}
 }
 
 lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
@@ -259,81 +388,6 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 	}
 
 	return on_tile_dir_key, off_tile_dir_key
-}
-
-update :: proc() {
-	if ui_update() do return
-
-	update_grid()
-}
-
-update_grid :: proc() {
-	if !rl.CheckCollisionPointRec(input.mouse.pos_px, grid.pos_px) {
-		return
-	}
-
-	if .LEFT in input.mouse.btns {
-		x, y := get_mouse_grid_pos()
-		hash := gen_hash(x, y)
-
-		t := &grid.tiles[hash]
-		t.colour = rl.RED
-	}
-}
-
-ui_update :: proc() -> bool {
-	return false
-}
-
-render :: proc() {
-	rl.BeginDrawing()
-	rl.ClearBackground(rl.LIGHTGRAY)
-
-	src: rl.Rectangle
-	for _, t in grid.tiles {
-		// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
-		rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
-		rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
-	}
-
-	ui_draw()
-	draw_debug_ui()
-
-	rl.EndDrawing()
-}
-
-ui_draw :: proc() {
-	rl.DrawTexturePro(
-		ui_tileset,
-		{0, 0, 32 * 4, 32 * 3},
-		{10, WINDOW_HEIGHT - 32 * 3 * 2 - 64 - 10, 32 * 4 * 2, 32 * 3 * 2},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-}
-
-draw_debug_ui :: proc() {
-	rl.DrawRectangleLinesEx(grid.pos_px, 1, rl.BLACK)
-	x, y := get_mouse_grid_pos()
-	rl.DrawText(
-		fmt.ctprintf("%v [%v] %v [%v]", x, NUM_TILES_IN_ROW, y, NUM_TILES_IN_COL),
-		10,
-		10,
-		20,
-		rl.BLACK,
-	)
-
-	i := 0
-	tile_x_offset: i32 = TILE_LEFT_OFFSET * TILE_SIZE
-	tile_y_offset: i32 = TILE_TOP_OFFSET * TILE_SIZE
-	for t in path {
-		x := t.x * TILE_SIZE + tile_x_offset
-		y := t.y * TILE_SIZE + tile_y_offset
-		rl.DrawRectangleLines(x, y, TILE_SIZE, TILE_SIZE, rl.PINK)
-		rl.DrawText(fmt.ctprint(i), x, y, 25, rl.BLACK)
-		i += 1
-	}
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
