@@ -17,8 +17,10 @@ UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
 UI_FONT_SIZE :: 18
 
 Window :: struct {
-	rec:   rl.Rectangle,
-	title: string,
+	title:          string,
+	rec:            rl.Rectangle,
+	drag_start_rec: rl.Rectangle,
+	dragging:       bool,
 }
 
 ui_tileset: rl.Texture2D
@@ -73,11 +75,18 @@ ui_update :: proc() -> bool {
 		}
 
 		if .LEFT in input.mouse.btns {
+			w.dragging = true
+		} else {
+			w.dragging = false
+		}
+
+		if w.dragging {
+			w.drag_start_rec = w.rec
 			titlebar := rl.Rectangle{w.rec.x, w.rec.y, w.rec.width, UI_TILE_SIZE}
 			if rl.CheckCollisionPointRec(input.mouse.pos_px, titlebar) {
 				fmt.printfln("in titlebar")
-				w.rec.x = input.mouse.pos_px.x
-				w.rec.y = input.mouse.pos_px.y
+				w.rec.x = w.drag_start_rec.x + input.mouse.pos_px.x
+				w.rec.y = w.drag_start_rec.y + input.mouse.pos_px.y
 			}
 		}
 	}
