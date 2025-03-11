@@ -15,6 +15,9 @@ TILE_SIZE :: SRC_TILE_SIZE * SCALE
 
 WINDOW_WIDTH :: NUM_TILES_IN_ROW * TILE_SIZE + UI_BORDER_TILE_SIZE * 2
 WINDOW_HEIGHT :: NUM_TILES_IN_COL * TILE_SIZE + UI_TILE_SIZE + UI_BOTTOM_BORDER_TILE_SIZE
+WIN_PADDING :: 20
+
+DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 
 // TILE_TOP_OFFSET :: 1
 // TILE_BOTTOM_OFFSET :: 1
@@ -48,6 +51,8 @@ grid: Grid
 path: [][2]i32
 tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
+tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
+tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -80,12 +85,10 @@ main :: proc() {
 
 setup :: proc() {
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
-	tile_x_offset: f32 = UI_BORDER_TILE_SIZE
-	tile_y_offset: f32 = UI_TILE_SIZE
 	grid = {
 		pos_px = {
-			x = tile_x_offset,
-			y = tile_y_offset,
+			x = f32(tile_x_offset),
+			y = f32(tile_y_offset),
 			width = f32(NUM_TILES_IN_ROW * TILE_SIZE),
 			height = f32(NUM_TILES_IN_COL * TILE_SIZE),
 		},
@@ -105,8 +108,8 @@ setup :: proc() {
 			grid.tiles[hash] = Tile {
 				pos_grid = {x, y},
 				pos_px = rl.Rectangle {
-					x = f32(x) * TILE_SIZE + tile_x_offset,
-					y = f32(y) * TILE_SIZE + tile_y_offset,
+					x = f32(x) * TILE_SIZE + f32(tile_x_offset),
+					y = f32(y) * TILE_SIZE + f32(tile_y_offset),
 					width = TILE_SIZE,
 					height = TILE_SIZE,
 				},
@@ -214,8 +217,8 @@ setup :: proc() {
 		grid.tiles[hash] = Tile {
 			pos_grid = {this_tile.x, this_tile.y},
 			pos_px   = {
-				f32(this_tile.x) * TILE_SIZE + tile_x_offset,
-				f32(this_tile.y) * TILE_SIZE + tile_y_offset,
+				f32(this_tile.x * TILE_SIZE + tile_x_offset),
+				f32(this_tile.y * TILE_SIZE + tile_y_offset),
 				TILE_SIZE,
 				TILE_SIZE,
 			},
@@ -241,9 +244,19 @@ update :: proc() {
 
 render :: proc() {
 	rl.BeginDrawing()
-	rl.ClearBackground(rl.LIGHTGRAY)
+	rl.ClearBackground(DOZE_311_BG_COLOUR)
 
-	draw_background_ui()
+	// Draw main UI window
+	ui_draw_window(
+		rl.Rectangle {
+			20,
+			20,
+			f32(rl.GetScreenWidth()) - WIN_PADDING * 2,
+			f32(rl.GetScreenHeight()) - WIN_PADDING * 2,
+		},
+		"Track Master 2000",
+		UI_BG_GRAY,
+	)
 
 	src: rl.Rectangle
 	for _, t in grid.tiles {
@@ -277,12 +290,6 @@ update_grid :: proc() {
 	}
 }
 
-draw_background_ui :: proc() {
-	ui_draw_window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, UI_BG_GRAY)
-
-	ui_draw_window(100, 100, 200, 100, rl.PINK, true)
-}
-
 draw_debug_ui :: proc() {
 	rl.DrawRectangleLinesEx(grid.pos_px, 1, rl.BLACK)
 	x, y := get_mouse_grid_pos()
@@ -295,8 +302,6 @@ draw_debug_ui :: proc() {
 	)
 
 	i := 0
-	tile_x_offset: i32 = UI_BORDER_TILE_SIZE
-	tile_y_offset: i32 = UI_TILE_SIZE
 	for t in path {
 		x := t.x * TILE_SIZE + tile_x_offset
 		y := t.y * TILE_SIZE + tile_y_offset
@@ -336,8 +341,6 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
-	tile_x_offset: i32 = UI_BORDER_TILE_SIZE
-	tile_y_offset: i32 = UI_TILE_SIZE
 	x := (i32(input.mouse.pos_px.x) - tile_x_offset) / TILE_SIZE
 	y := (i32(input.mouse.pos_px.y) - tile_y_offset) / TILE_SIZE
 	return x, y
