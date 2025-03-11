@@ -1,30 +1,36 @@
 package pathways
 
 import "core:fmt"
+import "core:math/rand"
 import "core:mem"
 // import "core:os"
 import rl "vendor:raylib"
 
-WINDOW_WIDTH :: 1920
-WINDOW_HEIGHT :: 1088
-NUM_TILES_IN_WIN_ROW :: 30
-NUM_TILES_IN_WIN_COL :: 17
+NUM_TILES_IN_ROW :: 30
+NUM_TILES_IN_COL :: 17
 
 SCALE :: 2
 SRC_TILE_SIZE :: 32
 TILE_SIZE :: SRC_TILE_SIZE * SCALE
-TILE_TOP_OFFSET :: 1
-TILE_BOTTOM_OFFSET :: 1
-TILE_LEFT_OFFSET :: 1
-TILE_RIGHT_OFFSET :: 1
-NUM_TILES_IN_ROW: i32 : NUM_TILES_IN_WIN_ROW - TILE_LEFT_OFFSET - TILE_RIGHT_OFFSET
-NUM_TILES_IN_COL: i32 : NUM_TILES_IN_WIN_COL - TILE_TOP_OFFSET - TILE_BOTTOM_OFFSET
+
+WINDOW_WIDTH :: NUM_TILES_IN_ROW * TILE_SIZE + UI_BORDER_TILE_SIZE * 2
+WINDOW_HEIGHT :: NUM_TILES_IN_COL * TILE_SIZE + UI_TILE_SIZE + UI_BOTTOM_BORDER_TILE_SIZE
+
+// TILE_TOP_OFFSET :: 1
+// TILE_BOTTOM_OFFSET :: 1
+// TILE_LEFT_OFFSET :: 1
+// TILE_RIGHT_OFFSET :: 1
+
+// NUM_TILES_IN_ROW: i32 : NUM_TILES_IN_WIN_ROW - TILE_LEFT_OFFSET - TILE_RIGHT_OFFSET
+// NUM_TILES_IN_COL: i32 : NUM_TILES_IN_WIN_COL - TILE_TOP_OFFSET - TILE_BOTTOM_OFFSET
+
+NUM_GRASS_TILES :: 4
 
 Tile :: struct {
 	pos_grid: []i32,
 	pos_px:   rl.Rectangle,
 	src_px:   rl.Rectangle,
-	colour:   rl.Color,
+	type:     TileType,
 }
 
 Grid :: struct {
@@ -33,24 +39,15 @@ Grid :: struct {
 }
 
 TileType :: enum {
-	HORIZONTAL,
-	VERTICAL,
-	CROSSING,
-	RIGHT_TO_UP,
-	RIGHT_TO_DOWN,
-	LEFT_TO_UP,
-	LEFT_TO_DOWN,
-	UP_TO_RIGHT,
-	UP_TO_LEFT,
-	DOWN_TO_RIGHT,
-	DOWN_TO_LEFT,
+	GRASS, // 0
+	TRACK,
 }
 
 input: Input
 grid: Grid
 path: [][2]i32
 tileset: rl.Texture2D
-tiles: map[TileType]rl.Rectangle
+grass_tileset: rl.Texture2D
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -67,10 +64,7 @@ main :: proc() {
 		mem.tracking_allocator_destroy(&track)
 	}
 
-	window_width: i32 = NUM_TILES_IN_WIN_ROW * TILE_SIZE
-	window_height: i32 = NUM_TILES_IN_WIN_COL * TILE_SIZE
-
-	rl.InitWindow(window_width, window_height, "Pathways")
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Pathways")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(500)
 	rl.SetExitKey(.ESCAPE)
@@ -86,8 +80,8 @@ main :: proc() {
 
 setup :: proc() {
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
-	tile_x_offset: f32 = TILE_LEFT_OFFSET * TILE_SIZE
-	tile_y_offset: f32 = TILE_TOP_OFFSET * TILE_SIZE
+	tile_x_offset: f32 = UI_BORDER_TILE_SIZE
+	tile_y_offset: f32 = UI_TILE_SIZE
 	grid = {
 		pos_px = {
 			x = tile_x_offset,
@@ -98,9 +92,15 @@ setup :: proc() {
 		tiles = make(map[u16]Tile, tot_num_tiles),
 	}
 
-	for y in 0 ..< NUM_TILES_IN_COL {
-		for x in 0 ..< NUM_TILES_IN_ROW {
+	for y in 0 ..< i32(NUM_TILES_IN_COL) {
+		for x in 0 ..< i32(NUM_TILES_IN_ROW) {
 			hash := gen_hash(x, y)
+			n := rand.int31_max(NUM_GRASS_TILES)
+			src_px := rl.Rectangle {
+				x      = f32(TILE_SIZE * n),
+				width  = TILE_SIZE,
+				height = TILE_SIZE,
+			}
 
 			grid.tiles[hash] = Tile {
 				pos_grid = {x, y},
@@ -110,7 +110,8 @@ setup :: proc() {
 					width = TILE_SIZE,
 					height = TILE_SIZE,
 				},
-				colour = rl.GRAY,
+				src_px = src_px,
+				type = .GRASS,
 			}
 		}
 	}
@@ -174,8 +175,6 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	fmt.printfln("%v", ts)
-
 	path = gen_path({0, 0}, 30, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
@@ -221,10 +220,12 @@ setup :: proc() {
 				TILE_SIZE,
 			},
 			src_px   = src_px,
+			type     = .TRACK,
 		}
 	}
 
 	tileset = rl.LoadTexture("res/tileset.png")
+	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
 
 	ui_setup()
 
@@ -246,9 +247,15 @@ render :: proc() {
 
 	src: rl.Rectangle
 	for _, t in grid.tiles {
-		// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
-		rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
-		rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
+		switch t.type {
+		case .TRACK:
+			// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+			rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+		// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
+
+		case .GRASS:
+		// rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+		}
 	}
 
 	ui_draw()
@@ -267,75 +274,13 @@ update_grid :: proc() {
 		hash := gen_hash(x, y)
 
 		t := &grid.tiles[hash]
-		t.colour = rl.RED
 	}
 }
 
 draw_background_ui :: proc() {
-	// Top bar
-	rl.DrawTexturePro(ui_tileset, {0, 0, 19, 19}, {0, 0, 28, 28}, {0, 0}, 0, rl.WHITE)
-	rl.DrawTexturePro(
-		ui_tileset,
-		{19 * 1, 0, 19, 19},
-		{1 * 28, 0, WINDOW_WIDTH - 28 * 2, 28},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-	rl.DrawTexturePro(
-		ui_tileset,
-		{19 * 2, 0, 19, 19},
-		{WINDOW_WIDTH - 28, 0, 28, 28},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
+	ui_draw_window(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, UI_BG_GRAY)
 
-	// Left border
-	rl.DrawTexturePro(
-		ui_tileset,
-		{0, 19, 19, 19},
-		{0, 1 * 28, 28, WINDOW_HEIGHT - 28 * 2},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-
-	// Right border
-	rl.DrawTexturePro(
-		ui_tileset,
-		{19 * 2, 19, 19, 19},
-		{WINDOW_WIDTH - 28, 1 * 28, 28, WINDOW_HEIGHT - 28 * 2},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-
-	// Bottom
-	rl.DrawTexturePro(
-		ui_tileset,
-		{0, 19 * 2, 19, 19},
-		{0, WINDOW_HEIGHT - 28, 28, 28},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-	rl.DrawTexturePro(
-		ui_tileset,
-		{19, 19 * 2, 19, 19},
-		{1 * 28, WINDOW_HEIGHT - 28, WINDOW_WIDTH - 28 * 2, 28},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
-	rl.DrawTexturePro(
-		ui_tileset,
-		{19 * 2, 19 * 2, 19, 19},
-		{WINDOW_WIDTH - 28, WINDOW_HEIGHT - 28, 28, 28},
-		{0, 0},
-		0,
-		rl.WHITE,
-	)
+	ui_draw_window(100, 100, 200, 100, rl.PINK, true)
 }
 
 draw_debug_ui :: proc() {
@@ -350,8 +295,8 @@ draw_debug_ui :: proc() {
 	)
 
 	i := 0
-	tile_x_offset: i32 = TILE_LEFT_OFFSET * TILE_SIZE
-	tile_y_offset: i32 = TILE_TOP_OFFSET * TILE_SIZE
+	tile_x_offset: i32 = UI_BORDER_TILE_SIZE
+	tile_y_offset: i32 = UI_TILE_SIZE
 	for t in path {
 		x := t.x * TILE_SIZE + tile_x_offset
 		y := t.y * TILE_SIZE + tile_y_offset
@@ -391,8 +336,8 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
-	tile_x_offset: i32 = TILE_LEFT_OFFSET * TILE_SIZE
-	tile_y_offset: i32 = TILE_TOP_OFFSET * TILE_SIZE
+	tile_x_offset: i32 = UI_BORDER_TILE_SIZE
+	tile_y_offset: i32 = UI_TILE_SIZE
 	x := (i32(input.mouse.pos_px.x) - tile_x_offset) / TILE_SIZE
 	y := (i32(input.mouse.pos_px.y) - tile_y_offset) / TILE_SIZE
 	return x, y

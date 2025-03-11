@@ -13,6 +13,7 @@ Direction :: enum {
 gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 	path := make([][2]i32, path_len)
 	path[0] = start_pos
+	hack_check := 0
 
 	for i in 1 ..< path_len {
 		directions := [4][2]i32{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
@@ -24,6 +25,12 @@ gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 		try_pos := prev_tile + directions[try_dir]
 
 		for !is_direction_valid(&path, try_pos, try_dir) {
+			// TODO:(lukefilewalker) the algo get's stuck ;( this is a crude fix ;(
+			if hack_check == 5 {
+				return gen_path(start_pos, path_len, maxx, maxy)
+			}
+			hack_check += 1
+
 			try_dir = rand.choice_enum(Direction)
 			tried_directions[try_dir] = directions[try_dir]
 			try_pos = prev_tile + directions[try_dir]
