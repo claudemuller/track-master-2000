@@ -93,8 +93,8 @@ setup :: proc() {
 			n := rand.int31_max(NUM_GRASS_TILES)
 			src_px := rl.Rectangle {
 				x      = f32(TILE_SIZE * n),
-				width  = TILE_SIZE,
-				height = TILE_SIZE,
+				width  = SRC_TILE_SIZE,
+				height = SRC_TILE_SIZE,
 			}
 
 			grid.tiles[hash] = Tile {

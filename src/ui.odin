@@ -14,7 +14,7 @@ UI_BOTTOM_BORDER_TILE_SIZE :: SRC_UI_BOTTOM_BORDER_TILE_SIZE * SCALE
 UI_BUTTON_TILE_SIZE :: SRC_UI_BUTTON_TILE_SIZE * SCALE
 
 UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
-UI_FONT_SIZE :: 18
+UI_FONT_SIZE :: 20
 
 Window :: struct {
 	title:          string,
@@ -26,9 +26,11 @@ Window :: struct {
 ui_tileset: rl.Texture2D
 windows: [dynamic]Window
 pos: rl.Rectangle
+font: rl.Font
 
 ui_setup :: proc() {
 	ui_tileset = rl.LoadTexture("res/ui.png")
+	font = rl.LoadFont("res/VT323-Regular.ttf")
 
 	win_width := f32(tileset.width * SCALE) + UI_BORDER_TILE_SIZE * 2
 	win_height := f32(tileset.height * SCALE) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE
@@ -134,7 +136,7 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 	)
 
 	// Draw Title
-	rl.DrawText(fmt.ctprintf("%s", title), i32(x) + 10, i32(y) + 10, UI_FONT_SIZE, rl.WHITE)
+	rl.DrawTextEx(font, fmt.ctprintf("%s", title), {x + 15, y + 10}, UI_FONT_SIZE, 1.5, rl.WHITE)
 
 	// Right corner
 	rl.DrawTexturePro(
