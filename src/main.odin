@@ -199,7 +199,7 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path = gen_path({0, 1}, 40, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path = gen_path({0, 1}, 30, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
 	hash: u16
@@ -320,6 +320,19 @@ render :: proc() {
 		case .NONE:
 		}
 	}
+
+	// Draw countdown
+	countdown_size: i32 = 25
+	countdown_txt := fmt.ctprintf(
+		"Imminent danger in: %d",
+		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)),
+	)
+	txt_w := rl.MeasureText(countdown_txt, countdown_size)
+	txt_h: i32 = 50
+	txt_x := rl.GetScreenWidth() / 2 - txt_w / 2
+	txt_y := tile_y_offset + 10
+	rl.DrawRectangle(txt_x - 20, txt_y - 10, txt_w + 40, txt_h, rl.BLACK - {0, 0, 0, 100})
+	rl.DrawText(countdown_txt, txt_x, txt_y, countdown_size, rl.RED)
 
 	ui_draw()
 	draw_debug_ui()
