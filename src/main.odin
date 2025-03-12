@@ -42,6 +42,8 @@ TileType :: enum {
 	NONE, // 0
 	GRASS,
 	TRACK,
+	STATION,
+	TOWN,
 }
 
 GameMemory :: struct {
@@ -54,6 +56,8 @@ grid: Grid
 path: [][2]i32
 tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
+station: rl.Texture2D
+town: rl.Texture2D
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
 level_end: Timer
@@ -133,6 +137,9 @@ setup :: proc() {
 		}
 	}
 
+	station_tile := &grid.tiles[0]
+	station_tile.type = .STATION
+
 	ts: [4][4]rl.Rectangle
 	ts[int(Direction.RIGHT)][int(Direction.RIGHT)] = {0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 	ts[int(Direction.RIGHT)][int(Direction.UP)] = {
@@ -192,9 +199,10 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path = gen_path({0, 0}, 30, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path = gen_path({0, 1}, 40, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
+	hash: u16
 	for i in 0 ..< len(path) {
 		this_tile := path[i]
 
@@ -227,7 +235,7 @@ setup :: proc() {
 			src_px = ts[on_tile_dir_key][off_tile_dir_key]
 		}
 
-		hash := gen_hash(this_tile.x, this_tile.y)
+		hash = gen_hash(this_tile.x, this_tile.y)
 		grid.tiles[hash] = Tile {
 			pos_grid = {f32(this_tile.x), f32(this_tile.y)},
 			pos_px   = {
@@ -240,9 +248,13 @@ setup :: proc() {
 			type     = .TRACK,
 		}
 	}
+	town_tile := &grid.tiles[hash]
+	town_tile.type = .TOWN
 
 	tileset = rl.LoadTexture("res/tileset.png")
 	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
+	station = rl.LoadTexture("res/station.png")
+	town = rl.LoadTexture("res/town.png")
 
 	ui_setup()
 	start_timer(&level_end, LEVEL_TIME_LIMIT)
@@ -284,6 +296,26 @@ render :: proc() {
 
 		case .GRASS:
 			rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+
+		case .STATION:
+			rl.DrawTexturePro(
+				station,
+				{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+				t.pos_px,
+				{0, 0},
+				0,
+				rl.WHITE,
+			)
+
+		case .TOWN:
+			rl.DrawTexturePro(
+				town,
+				{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+				t.pos_px,
+				{0, 0},
+				0,
+				rl.WHITE,
+			)
 
 		case .NONE:
 		}
