@@ -155,7 +155,7 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 			SRC_UI_BUTTON_TILE_SIZE,
 			SRC_UI_BUTTON_TILE_SIZE,
 		},
-		{x + width - UI_BUTTON_TILE_SIZE - 10, y + 11, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
+		{x + width - UI_BUTTON_TILE_SIZE - 10, y + 10, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
 		{0, 0},
 		0,
 		rl.WHITE,

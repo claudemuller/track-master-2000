@@ -19,14 +19,6 @@ WIN_PADDING :: 20
 
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 
-// TILE_TOP_OFFSET :: 1
-// TILE_BOTTOM_OFFSET :: 1
-// TILE_LEFT_OFFSET :: 1
-// TILE_RIGHT_OFFSET :: 1
-
-// NUM_TILES_IN_ROW: i32 : NUM_TILES_IN_WIN_ROW - TILE_LEFT_OFFSET - TILE_RIGHT_OFFSET
-// NUM_TILES_IN_COL: i32 : NUM_TILES_IN_WIN_COL - TILE_TOP_OFFSET - TILE_BOTTOM_OFFSET
-
 NUM_GRASS_TILES :: 4
 
 Tile :: struct {
@@ -267,7 +259,7 @@ render :: proc() {
 		// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
 
 		case .GRASS:
-		// rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+			rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
 		}
 	}
 
