@@ -1,1 +1,1 @@
-odin run src -out=bin\pathways.exe
+odin run src -out=bin\tm2000.exe

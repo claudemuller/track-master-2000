@@ -1,5 +1,5 @@
 BIN_DIR := ./bin
-BIN := ${BIN_DIR}/game
+BIN := ${BIN_DIR}/tm2000
 SRC := ./src
 
 run: bin-dir

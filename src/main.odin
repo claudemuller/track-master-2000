@@ -72,7 +72,7 @@ main :: proc() {
 		mem.tracking_allocator_destroy(&track)
 	}
 
-	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Pathways")
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Track Master 2000™")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(500)
 	rl.SetExitKey(.ESCAPE)
@@ -261,7 +261,7 @@ render :: proc() {
 
 	// Draw main UI window
 	ui_draw_window(
-		"Track Master 2000",
+		"Track Master 2000™",
 		rl.Rectangle {
 			20,
 			20,
