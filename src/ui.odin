@@ -1,6 +1,7 @@
 package pathways
 
 import "core:fmt"
+import "core:math"
 import rl "vendor:raylib"
 
 SRC_UI_TILE_SIZE :: 19
@@ -39,7 +40,7 @@ ButtonType :: enum {
 
 ui_tileset: rl.Texture2D
 windows: [dynamic]Window
-pos: rl.Rectangle
+track_tiles: rl.Rectangle
 font: rl.Font
 
 ui_setup :: proc() {
@@ -55,11 +56,11 @@ ui_setup :: proc() {
 	}
 	append(&windows, ui_new_window("Track pieces", win_rec))
 
-	pos = windows[0].rec
-	pos.x += UI_BORDER_TILE_SIZE
-	pos.y += UI_TILE_SIZE
-	pos.width = f32(tileset.width * SCALE)
-	pos.height = f32(tileset.height * SCALE)
+	track_tiles = windows[0].rec
+	track_tiles.x += UI_BORDER_TILE_SIZE
+	track_tiles.y += UI_TILE_SIZE
+	track_tiles.width = f32(tileset.width * SCALE)
+	track_tiles.height = f32(tileset.height * SCALE)
 }
 
 ui_draw :: proc() {
@@ -67,14 +68,27 @@ ui_draw :: proc() {
 		ui_draw_window(w.title, w.rec, UI_BG_GRAY, true)
 	}
 
+	// Draw the tileset
 	rl.DrawTexturePro(
 		tileset,
 		{0, 0, f32(tileset.width), f32(tileset.height)},
-		pos,
+		track_tiles,
 		{0, 0},
 		0,
 		rl.WHITE,
 	)
+
+	// Draw the selected tile
+	if game_mem.selected_tile.type != .NONE {
+		dst := rl.Rectangle {
+			track_tiles.x + f32(game_mem.selected_tile.pos_grid.x * TILE_SIZE),
+			track_tiles.y + f32(game_mem.selected_tile.pos_grid.y * TILE_SIZE),
+			TILE_SIZE,
+			TILE_SIZE,
+		}
+		rl.DrawRectangleLinesEx(dst, 1, rl.RED)
+		// fmt.printfln("%v %v %v", track_tiles, selected_tile, dst)
+	}
 }
 
 ui_update :: proc() -> bool {
@@ -86,10 +100,33 @@ ui_update :: proc() -> bool {
 		if .LEFT in input.mouse.btns {
 			// w.dragging = true
 
-			// Handle button presses
+			// Handle window button presses
 			if rl.CheckCollisionPointRec(input.mouse.pos_px, w.buttons.close.pos_px) {
 				fmt.printfln("close pressed")
 				// append(&windows, ui_new_window("test", {200, 200, 200, 200}))
+			}
+
+			// Handle track_tiles button presses
+			if rl.CheckCollisionPointRec(input.mouse.pos_px, track_tiles) {
+				// Store tileset grid x and y
+				// BUG:(lukefilewalker) x is not correct :(
+				x := math.floor_f32((input.mouse.pos_px.x - w.rec.x) / TILE_SIZE)
+				// BUG:(lukefilewalker) y is messed up :(
+				y := math.floor_f32(
+					(input.mouse.pos_px.y - w.rec.y - f32(tile_y_offset)) / TILE_SIZE,
+				)
+
+				game_mem.selected_tile = {
+					pos_grid = {x, y},
+					src_px   = {
+						x * SRC_TILE_SIZE,
+						y * SRC_TILE_SIZE,
+						SRC_TILE_SIZE,
+						SRC_TILE_SIZE,
+					},
+					pos_px   = {0, 0, TILE_SIZE, TILE_SIZE},
+					type     = .TRACK,
+				}
 			}
 		} else {
 			w.dragging = false
@@ -106,7 +143,7 @@ ui_update :: proc() -> bool {
 		}
 	}
 
-	return false
+	return true
 }
 
 ui_new_window :: proc(title: string, rec: rl.Rectangle) -> Window {

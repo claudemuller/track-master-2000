@@ -1,6 +1,7 @@
 package pathways
 
 import "core:fmt"
+import "core:math"
 import "core:math/rand"
 import "core:mem"
 // import "core:os"
@@ -22,7 +23,7 @@ DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
 Tile :: struct {
-	pos_grid: []i32,
+	pos_grid: rl.Vector2,
 	pos_px:   rl.Rectangle,
 	src_px:   rl.Rectangle,
 	type:     TileType,
@@ -34,10 +35,16 @@ Grid :: struct {
 }
 
 TileType :: enum {
-	GRASS, // 0
+	NONE, // 0
+	GRASS,
 	TRACK,
 }
 
+GameMemory :: struct {
+	selected_tile: Tile,
+}
+
+game_mem: GameMemory
 input: Input
 grid: Grid
 path: [][2]i32
@@ -45,7 +52,7 @@ tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
-selected_tile: Tile
+// selected_tile: Tile
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -53,12 +60,12 @@ main :: proc() {
 	context.allocator = mem.tracking_allocator(&track)
 
 	defer {
-		for _, entry in track.allocation_map {
-			fmt.eprintf("%v leaked %v bytes\n", entry.location, entry.size)
-		}
-		for entry in track.bad_free_array {
-			fmt.eprintf("%v bad free\n", entry.location)
-		}
+		// for _, entry in track.allocation_map {
+		// 	fmt.eprintf("%v leaked %v bytes\n", entry.location, entry.size)
+		// }
+		// for entry in track.bad_free_array {
+		// 	fmt.eprintf("%v bad free\n", entry.location)
+		// }
 		mem.tracking_allocator_destroy(&track)
 	}
 
@@ -77,6 +84,10 @@ main :: proc() {
 }
 
 setup :: proc() {
+	game_mem = {
+		selected_tile = {pos_px = {1, 1, 1, 1}},
+	}
+
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
 	grid = {
 		pos_px = {
@@ -91,15 +102,16 @@ setup :: proc() {
 	for y in 0 ..< i32(NUM_TILES_IN_COL) {
 		for x in 0 ..< i32(NUM_TILES_IN_ROW) {
 			hash := gen_hash(x, y)
+			// TODO:(lukefilewalker) more grass than flowers
 			n := rand.int31_max(NUM_GRASS_TILES)
 			src_px := rl.Rectangle {
-				x      = f32(TILE_SIZE * n),
+				x      = f32(SRC_TILE_SIZE * n),
 				width  = SRC_TILE_SIZE,
 				height = SRC_TILE_SIZE,
 			}
 
 			grid.tiles[hash] = Tile {
-				pos_grid = {x, y},
+				pos_grid = {f32(x), f32(y)},
 				pos_px = rl.Rectangle {
 					x = f32(x) * TILE_SIZE + f32(tile_x_offset),
 					y = f32(y) * TILE_SIZE + f32(tile_y_offset),
@@ -208,7 +220,7 @@ setup :: proc() {
 
 		hash := gen_hash(this_tile.x, this_tile.y)
 		grid.tiles[hash] = Tile {
-			pos_grid = {this_tile.x, this_tile.y},
+			pos_grid = {f32(this_tile.x), f32(this_tile.y)},
 			pos_px   = {
 				f32(this_tile.x * TILE_SIZE + tile_x_offset),
 				f32(this_tile.y * TILE_SIZE + tile_y_offset),
@@ -261,7 +273,21 @@ render :: proc() {
 
 		case .GRASS:
 			rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+
+		case .NONE:
 		}
+	}
+
+	if game_mem.selected_tile.type != .NONE {
+		// 	rl.DrawTexturePro(
+		// 		tileset,
+		// 		game_mem.selected_tile.src_px,
+		// 		game_mem.selected_tile.pos_px,
+		// 		{0, 0},
+		// 		0,
+		// 		rl.WHITE,
+		// 	)
+		rl.DrawRectangleLinesEx(game_mem.selected_tile.pos_px, 2, rl.BLACK)
 	}
 
 	ui_draw()
@@ -276,10 +302,17 @@ update_grid :: proc() {
 	}
 
 	if .LEFT in input.mouse.btns {
-		x, y := get_mouse_grid_pos()
-		hash := gen_hash(x, y)
+		if game_mem.selected_tile.type != .NONE {
+			x, y := get_mouse_grid_pos()
+			hash := gen_hash(x, y)
 
-		t := &grid.tiles[hash]
+			t := &grid.tiles[hash]
+			t.src_px.x = game_mem.selected_tile.src_px.x
+			t.src_px.y = game_mem.selected_tile.src_px.y
+			t.pos_px.x = f32(x * TILE_SIZE + tile_x_offset)
+			t.pos_px.y = f32(y * TILE_SIZE + tile_y_offset)
+			t.type = game_mem.selected_tile.type
+		}
 	}
 }
 
@@ -334,9 +367,9 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
-	x := (i32(input.mouse.pos_px.x) - tile_x_offset) / TILE_SIZE
-	y := (i32(input.mouse.pos_px.y) - tile_y_offset) / TILE_SIZE
-	return x, y
+	x := math.floor_f32(f32(i32(input.mouse.pos_px.x) - tile_x_offset) / TILE_SIZE)
+	y := math.floor_f32(f32(i32(input.mouse.pos_px.y) - tile_y_offset) / TILE_SIZE)
+	return i32(x), i32(y)
 }
 
 gen_hash :: proc(x, y: i32) -> u16 {
