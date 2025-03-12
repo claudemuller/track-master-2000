@@ -45,6 +45,7 @@ tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
+selected_tile: Tile
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -240,13 +241,13 @@ render :: proc() {
 
 	// Draw main UI window
 	ui_draw_window(
+		"Track Master 2000",
 		rl.Rectangle {
 			20,
 			20,
 			f32(rl.GetScreenWidth()) - WIN_PADDING * 2,
 			f32(rl.GetScreenHeight()) - WIN_PADDING * 2,
 		},
-		"Track Master 2000",
 		UI_BG_GRAY,
 	)
 

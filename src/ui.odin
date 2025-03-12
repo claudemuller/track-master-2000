@@ -21,6 +21,20 @@ Window :: struct {
 	rec:            rl.Rectangle,
 	drag_start_rec: rl.Rectangle,
 	dragging:       bool,
+	buttons:        struct {
+		close:    Button,
+		maximise: Button,
+		minimise: Button,
+	},
+}
+
+Button :: struct {
+	pos_px: rl.Rectangle,
+	type:   ButtonType,
+}
+
+ButtonType :: enum {
+	CLOSE,
 }
 
 ui_tileset: rl.Texture2D
@@ -33,20 +47,13 @@ ui_setup :: proc() {
 	font = rl.LoadFont("res/VT323-Regular.ttf")
 
 	win_width := f32(tileset.width * SCALE) + UI_BORDER_TILE_SIZE * 2
-	win_height := f32(tileset.height * SCALE) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE
-
-	append(
-		&windows,
-		Window {
-			title = "Track pieces",
-			rec = rl.Rectangle {
-				f32(rl.GetScreenWidth()) - win_width - WIN_PADDING * 2,
-				UI_TILE_SIZE + WIN_PADDING * 1.5,
-				win_width,
-				win_height,
-			},
-		},
-	)
+	win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth()) - win_width - WIN_PADDING * 2,
+		y      = f32(UI_TILE_SIZE + WIN_PADDING * 1.5),
+		height = f32(tileset.height * SCALE) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE,
+		width  = win_width,
+	}
+	append(&windows, ui_new_window("Track pieces", win_rec))
 
 	pos = windows[0].rec
 	pos.x += UI_BORDER_TILE_SIZE
@@ -57,7 +64,7 @@ ui_setup :: proc() {
 
 ui_draw :: proc() {
 	for w in windows {
-		ui_draw_window(w.rec, w.title, UI_BG_GRAY, true)
+		ui_draw_window(w.title, w.rec, UI_BG_GRAY, true)
 	}
 
 	rl.DrawTexturePro(
@@ -77,7 +84,13 @@ ui_update :: proc() -> bool {
 		}
 
 		if .LEFT in input.mouse.btns {
-			w.dragging = true
+			// w.dragging = true
+
+			// Handle button presses
+			if rl.CheckCollisionPointRec(input.mouse.pos_px, w.buttons.close.pos_px) {
+				fmt.printfln("close pressed")
+				// append(&windows, ui_new_window("test", {200, 200, 200, 200}))
+			}
 		} else {
 			w.dragging = false
 		}
@@ -96,9 +109,26 @@ ui_update :: proc() -> bool {
 	return false
 }
 
+ui_new_window :: proc(title: string, rec: rl.Rectangle) -> Window {
+	return Window {
+		title = title,
+		rec = rec,
+		buttons = {
+			close = {
+				pos_px = {
+					rec.x + rec.width - UI_BUTTON_TILE_SIZE - 10,
+					rec.y + 10,
+					UI_BUTTON_TILE_SIZE,
+					UI_BUTTON_TILE_SIZE,
+				},
+			},
+		},
+	}
+}
+
 ui_draw_window :: proc(
-	win_rec: rl.Rectangle,
 	title: string,
+	win_rec: rl.Rectangle,
 	bg_colour: rl.Color,
 	has_shadow := false,
 ) {
