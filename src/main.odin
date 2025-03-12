@@ -199,7 +199,7 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path = gen_path({0, 1}, 30, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path = gen_path({0, 1}, 50, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
 	hash: u16

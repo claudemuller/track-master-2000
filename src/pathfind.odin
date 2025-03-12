@@ -24,10 +24,13 @@ gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 		tried_directions[try_dir] = directions[try_dir]
 		try_pos := prev_tile + directions[try_dir]
 
+		fmt.printfln("path:%v\n>try_pos:%v try_dir:%v", path, try_pos, try_dir)
+
 		for !is_direction_valid(&path, try_pos, try_dir) {
 			// TODO:(lukefilewalker) the algo get's stuck ;( this is a crude fix ;(
 			if hack_check == 5 {
-				return gen_path(start_pos, path_len, maxx, maxy)
+				// return gen_path(start_pos, path_len, maxx, maxy)
+				return nil
 			}
 			hack_check += 1
 
@@ -35,10 +38,13 @@ gen_path :: proc(start_pos: [2]i32, path_len, maxx, maxy: i32) -> [][2]i32 {
 			tried_directions[try_dir] = directions[try_dir]
 			try_pos = prev_tile + directions[try_dir]
 
+			fmt.printfln(">>>try_pos:%v try_dir:%v", try_pos, try_dir)
+
 			if len(tried_directions) == 4 {
 				directions = [4][2]i32{{0, -2}, {2, 0}, {0, 2}, {-2, 0}}
 			}
 		}
+		// hack_check = 0
 
 		path[i] = try_pos
 	}
