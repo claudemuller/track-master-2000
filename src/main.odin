@@ -278,18 +278,6 @@ render :: proc() {
 		}
 	}
 
-	if game_mem.selected_tile.type != .NONE {
-		// 	rl.DrawTexturePro(
-		// 		tileset,
-		// 		game_mem.selected_tile.src_px,
-		// 		game_mem.selected_tile.pos_px,
-		// 		{0, 0},
-		// 		0,
-		// 		rl.WHITE,
-		// 	)
-		rl.DrawRectangleLinesEx(game_mem.selected_tile.pos_px, 2, rl.BLACK)
-	}
-
 	ui_draw()
 	// draw_debug_ui()
 
