@@ -109,9 +109,7 @@ ui_update :: proc() -> bool {
 			// Handle track_tiles button presses
 			if rl.CheckCollisionPointRec(input.mouse.pos_px, track_tiles) {
 				// Store tileset grid x and y
-				// BUG:(lukefilewalker) x is not correct :(
 				x := math.floor_f32((input.mouse.pos_px.x - track_tiles.x) / TILE_SIZE)
-				// BUG:(lukefilewalker) y is messed up :(
 				y := math.floor_f32((input.mouse.pos_px.y - track_tiles.y) / TILE_SIZE)
 
 				game_mem.selected_tile = {

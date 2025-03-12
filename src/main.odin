@@ -102,8 +102,13 @@ setup :: proc() {
 	for y in 0 ..< i32(NUM_TILES_IN_COL) {
 		for x in 0 ..< i32(NUM_TILES_IN_ROW) {
 			hash := gen_hash(x, y)
-			// TODO:(lukefilewalker) more grass than flowers
-			n := rand.int31_max(NUM_GRASS_TILES)
+
+			chance := rand.choice([]bool{true, false, false})
+			n := rand.int31_max(NUM_GRASS_TILES / 2)
+			if chance {
+				n += 1
+			}
+
 			src_px := rl.Rectangle {
 				x      = f32(SRC_TILE_SIZE * n),
 				width  = SRC_TILE_SIZE,
