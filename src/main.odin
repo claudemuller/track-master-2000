@@ -1,4 +1,4 @@
-package pathways
+package tm2000
 
 import "core:fmt"
 import "core:math"
@@ -22,8 +22,9 @@ WINDOW_HEIGHT ::
 WIN_PADDING :: 20
 
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
-
 NUM_GRASS_TILES :: 4
+
+LEVEL_TIME_LIMIT :: 10 // Seconds
 
 Tile :: struct {
 	pos_grid: rl.Vector2,
@@ -55,7 +56,7 @@ tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
-// selected_tile: Tile
+level_end: Timer
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -244,15 +245,17 @@ setup :: proc() {
 	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
 
 	ui_setup()
-
-	// fmt.printfln("%v", path)
-	// os.exit(0)
+	start_timer(&level_end, LEVEL_TIME_LIMIT)
 }
 
 update :: proc() {
 	if ui_update() do return
 
 	update_grid()
+
+	if timer_done(level_end) {
+		fmt.println("game over")
+	}
 }
 
 render :: proc() {
@@ -261,7 +264,7 @@ render :: proc() {
 
 	// Draw main UI window
 	ui_draw_window(
-		"Track Master 2000™",
+		"Track Master 2000",
 		rl.Rectangle {
 			20,
 			20,
@@ -287,7 +290,7 @@ render :: proc() {
 	}
 
 	ui_draw()
-	// draw_debug_ui()
+	draw_debug_ui()
 
 	rl.EndDrawing()
 }
@@ -313,15 +316,7 @@ update_grid :: proc() {
 }
 
 draw_debug_ui :: proc() {
-	rl.DrawRectangleLinesEx(grid.pos_px, 1, rl.BLACK)
-	x, y := get_mouse_grid_pos()
-	rl.DrawText(
-		fmt.ctprintf("%v [%v] %v [%v]", x, NUM_TILES_IN_ROW, y, NUM_TILES_IN_COL),
-		10,
-		10,
-		20,
-		rl.BLACK,
-	)
+	rl.DrawText(fmt.ctprintf("%v", get_elapsed(level_end)), 10, 10, 20, rl.BLACK)
 
 	i := 0
 	for t in path {

@@ -1,4 +1,4 @@
-package pathways
+package tm2000
 
 import "core:fmt"
 import "core:math"
