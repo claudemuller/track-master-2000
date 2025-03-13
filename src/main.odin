@@ -292,30 +292,36 @@ update :: proc() {
 	case .PLAYING:
 		update_grid()
 
+		// if camera_shake_duration > 0 {
+		// 	camera.offset.x = f32(
+		// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+		// 	)
+		// 	camera.offset.y = f32(
+		// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+		// 	)
+		// 	camera_shake_duration -= 1
+		// } else {
+		// 	camera.offset = {0, 0}
+		// }
+
 		// Level time is up, check path
 		if timer_done(level_end) {
-			if !check_path(path_tiles, proposed_path) {
-				game_mem.state = .GAME_OVER
-
-				camera_shake_duration = CAMERA_SHAKE_DURATION
-
-				// if camera_shake_duration > 0 {
-				// 	camera.offset.x = f32(
-				// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-				// 	)
-				// 	camera.offset.y = f32(
-				// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-				// 	)
-				// 	camera_shake_duration -= 1
-				// } else {
-				// 	camera.offset = {0, 0}
-				// }
-			} else {
-				game_mem.state = .WIN
-			}
+			check_path(path_tiles, proposed_path)
 		}
 	case .SIMULATING:
-		update_grid()
+		check_path(path_tiles, proposed_path)
+
+	// if camera_shake_duration > 0 {
+	// 	camera.offset.x = f32(
+	// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+	// 	)
+	// 	camera.offset.y = f32(
+	// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+	// 	)
+	// 	camera_shake_duration -= 1
+	// } else {
+	// 	camera.offset = {0, 0}
+	// }
 	case .WIN:
 	case .GAME_OVER:
 	}
@@ -436,15 +442,16 @@ update_grid :: proc() {
 	}
 }
 
-check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) -> bool {
+check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 	for i in 0 ..< len(proposed_path) - 1 {
 		if proposed_path[i].pos_grid != path[i].pos_grid ||
 		   proposed_path[i].src_px != path[i].src_px ||
 		   proposed_path[i].type != path[i].type {
-			return false
+			game_mem.state = .GAME_OVER
+			camera_shake_duration = CAMERA_SHAKE_DURATION
 		}
 	}
-	return true
+	game_mem.state = .WIN
 }
 
 draw_debug_ui :: proc() {
