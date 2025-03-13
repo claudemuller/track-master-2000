@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:mem"
+import "core:os"
 // import "core:os"
 import rl "vendor:raylib"
 
@@ -20,6 +21,8 @@ WINDOW_HEIGHT ::
 	(UI_TILE_SIZE + UI_BOTTOM_BORDER_TILE_SIZE) +
 	(WIN_PADDING * 2)
 WIN_PADDING :: 20
+CAMERA_SHAKE_MAGNITUDE :: 5.0
+CAMERA_SHAKE_DURATION :: 15
 
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
@@ -52,15 +55,21 @@ GameMemory :: struct {
 
 game_mem: GameMemory
 input: Input
+camera_shake_duration: f32
+level_end: Timer
+
 grid: Grid
 path: [][2]i32
+path_tiles: [dynamic]Tile
+proposed_path: [dynamic]Tile
+
 tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 station: rl.Texture2D
 town: rl.Texture2D
+
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
-level_end: Timer
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -199,7 +208,8 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path = gen_path({0, 1}, 50, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path_len: i32 = 100
+	path = gen_path({0, 1}, path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
 	hash: u16
@@ -236,7 +246,7 @@ setup :: proc() {
 		}
 
 		hash = gen_hash(this_tile.x, this_tile.y)
-		grid.tiles[hash] = Tile {
+		t := Tile {
 			pos_grid = {f32(this_tile.x), f32(this_tile.y)},
 			pos_px   = {
 				f32(this_tile.x * TILE_SIZE + tile_x_offset),
@@ -247,7 +257,10 @@ setup :: proc() {
 			src_px   = src_px,
 			type     = .TRACK,
 		}
+		grid.tiles[hash] = t
+		append(&path_tiles, t)
 	}
+
 	town_tile := &grid.tiles[hash]
 	town_tile.type = .TOWN
 
@@ -261,12 +274,32 @@ setup :: proc() {
 }
 
 update :: proc() {
+	// TODO:(lukefilewalker) everything else won't get updated if the ui consumes input :(
 	if ui_update() do return
 
 	update_grid()
 
+	// Level time is up, check path
 	if timer_done(level_end) {
-		fmt.println("game over")
+		if !check_path(path_tiles, proposed_path) {
+			fmt.printfln("game over")
+
+			camera_shake_duration = CAMERA_SHAKE_DURATION
+
+			// if camera_shake_duration > 0 {
+			// 	camera.offset.x = f32(
+			// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+			// 	)
+			// 	camera.offset.y = f32(
+			// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+			// 	)
+			// 	camera_shake_duration -= 1
+			// } else {
+			// 	camera.offset = {0, 0}
+			// }
+		} else {
+			fmt.printfln("you win")
+		}
 	}
 }
 
@@ -356,8 +389,28 @@ update_grid :: proc() {
 			t.pos_px.x = f32(x * TILE_SIZE + tile_x_offset)
 			t.pos_px.y = f32(y * TILE_SIZE + tile_y_offset)
 			t.type = game_mem.selected_tile.type
+
+			append(
+				&proposed_path,
+				Tile {
+					pos_grid = {f32(x), f32(y)},
+					src_px = t.src_px,
+					type = game_mem.selected_tile.type,
+				},
+			)
 		}
 	}
+}
+
+check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) -> bool {
+	for i in 0 ..< len(proposed_path) - 1 {
+		if proposed_path[i].pos_grid != path[i].pos_grid ||
+		   proposed_path[i].src_px != path[i].src_px ||
+		   proposed_path[i].type != path[i].type {
+			return false
+		}
+	}
+	return true
 }
 
 draw_debug_ui :: proc() {
