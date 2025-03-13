@@ -27,7 +27,7 @@ CAMERA_SHAKE_DURATION :: 15
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
-LEVEL_TIME_LIMIT :: 10 // Seconds
+LEVEL_TIME_LIMIT :: 30 // Seconds
 
 Tile :: struct {
 	pos_grid: rl.Vector2,
@@ -49,8 +49,17 @@ TileType :: enum {
 	TOWN,
 }
 
+GameState :: enum {
+	MAIN_MENU,
+	PLAYING,
+	SIMULATING,
+	WIN,
+	GAME_OVER,
+}
+
 GameMemory :: struct {
 	selected_tile: Tile,
+	state:         GameState,
 }
 
 game_mem: GameMemory
@@ -256,7 +265,7 @@ setup :: proc() {
 			src_px   = src_px,
 			type     = .TRACK,
 		}
-		grid.tiles[hash] = t
+		// grid.tiles[hash] = t
 		append(&path_tiles, t)
 	}
 
@@ -269,6 +278,8 @@ setup :: proc() {
 	town = rl.LoadTexture("res/town.png")
 
 	ui_setup()
+	game_mem.state = .MAIN_MENU
+
 	start_timer(&level_end, LEVEL_TIME_LIMIT)
 }
 
@@ -276,29 +287,37 @@ update :: proc() {
 	// TODO:(lukefilewalker) everything else won't get updated if the ui consumes input :(
 	if ui_update() do return
 
-	update_grid()
+	switch game_mem.state {
+	case .MAIN_MENU:
+	case .PLAYING:
+		update_grid()
 
-	// Level time is up, check path
-	if timer_done(level_end) {
-		if !check_path(path_tiles, proposed_path) {
-			fmt.printfln("game over")
+		// Level time is up, check path
+		if timer_done(level_end) {
+			if !check_path(path_tiles, proposed_path) {
+				game_mem.state = .GAME_OVER
 
-			camera_shake_duration = CAMERA_SHAKE_DURATION
+				camera_shake_duration = CAMERA_SHAKE_DURATION
 
-			// if camera_shake_duration > 0 {
-			// 	camera.offset.x = f32(
-			// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-			// 	)
-			// 	camera.offset.y = f32(
-			// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-			// 	)
-			// 	camera_shake_duration -= 1
-			// } else {
-			// 	camera.offset = {0, 0}
-			// }
-		} else {
-			fmt.printfln("you win")
+				// if camera_shake_duration > 0 {
+				// 	camera.offset.x = f32(
+				// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+				// 	)
+				// 	camera.offset.y = f32(
+				// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
+				// 	)
+				// 	camera_shake_duration -= 1
+				// } else {
+				// 	camera.offset = {0, 0}
+				// }
+			} else {
+				game_mem.state = .WIN
+			}
 		}
+	case .SIMULATING:
+		update_grid()
+	case .WIN:
+	case .GAME_OVER:
 	}
 }
 
@@ -397,6 +416,9 @@ update_grid :: proc() {
 					type = game_mem.selected_tile.type,
 				},
 			)
+
+			// Remove tile from available tiles
+			tile_nums[hash] -= 1
 		}
 	}
 
@@ -408,7 +430,8 @@ update_grid :: proc() {
 			t := &grid.tiles[hash]
 			t.type = .GRASS
 
-			// TODO:(lukefilewalker) add tile back to tileset UI
+			// Put tile back into available tiles
+			tile_nums[hash] += 1
 		}
 	}
 }

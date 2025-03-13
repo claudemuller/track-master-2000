@@ -13,6 +13,9 @@ UI_TILE_SIZE :: SRC_UI_TILE_SIZE * SCALE
 UI_BORDER_TILE_SIZE :: SRC_UI_BORDER_TILE_SIZE * SCALE
 UI_BOTTOM_BORDER_TILE_SIZE :: SRC_UI_BOTTOM_BORDER_TILE_SIZE * SCALE
 UI_BUTTON_TILE_SIZE :: SRC_UI_BUTTON_TILE_SIZE * SCALE
+UI_HORIZONTAL_RULE_SIZE :: 20
+UI_BUTTON_SIZE :: 40
+UI_BUTTON_PADDING :: 10
 
 UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
 UI_FONT_SIZE :: 20
@@ -30,8 +33,10 @@ Window :: struct {
 }
 
 Button :: struct {
-	pos_px: rl.Rectangle,
-	type:   ButtonType,
+	pos_px:   rl.Rectangle,
+	type:     ButtonType,
+	label:    string,
+	on_click: proc(),
 }
 
 ButtonType :: enum {
@@ -40,6 +45,7 @@ ButtonType :: enum {
 
 ui_tileset: rl.Texture2D
 windows: [dynamic]Window
+buttons: [dynamic]Button
 track_tiles: rl.Rectangle
 font: rl.Font
 tile_nums: map[u16]i32
@@ -52,7 +58,9 @@ ui_setup :: proc() {
 	win_rec := rl.Rectangle {
 		x      = f32(rl.GetScreenWidth()) - win_width - WIN_PADDING * 2,
 		y      = f32(UI_TILE_SIZE + WIN_PADDING * 1.5),
-		height = f32(tileset.height * SCALE) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE,
+		height = f32(
+			tileset.height * SCALE,
+		) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = win_width,
 	}
 	append(&windows, ui_new_window("Track pieces", win_rec))
@@ -70,6 +78,14 @@ ui_setup :: proc() {
 		tile_nums[hash] += 1
 	}
 
+	append(
+		&buttons,
+		new_button(
+			track_tiles.x + UI_BUTTON_PADDING,
+			track_tiles.y + track_tiles.height + 10,
+			"Simulate",
+		),
+	)
 }
 
 ui_draw :: proc() {
@@ -87,18 +103,6 @@ ui_draw :: proc() {
 		rl.WHITE,
 	)
 
-	// Draw the selected tile
-	if game_mem.selected_tile.type != .NONE {
-		dst := rl.Rectangle {
-			track_tiles.x + f32(game_mem.selected_tile.pos_grid.x * TILE_SIZE),
-			track_tiles.y + f32(game_mem.selected_tile.pos_grid.y * TILE_SIZE),
-			TILE_SIZE,
-			TILE_SIZE,
-		}
-		rl.DrawRectangleLinesEx(dst, 1, rl.RED)
-		// fmt.printfln("%v %v %v", track_tiles, selected_tile, dst)
-	}
-
 	// Draw tile number indicator
 	// TODO:(lukefilewalker) horrendous perf :((((((
 	i := 0
@@ -112,8 +116,18 @@ ui_draw :: proc() {
 		for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
 			for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
 				hash := gen_hash(x, y)
+
+				// Draw tile outlines
+				dst := rl.Rectangle {
+					f32(x) * TILE_SIZE + track_tiles.x,
+					f32(y) * TILE_SIZE + track_tiles.y,
+					TILE_SIZE,
+					TILE_SIZE,
+				}
+				rl.DrawRectangleLinesEx(dst, 1, rl.GRAY)
+
 				if hash == k {
-					fmt.printfln("h:%v k:%v v:%v", hash, k, tile_nums[k])
+					// fmt.printfln("h:%v k:%v v:%v", hash, k, tile_nums[k])
 
 					px_x := x * TILE_SIZE + i32(track_tiles.x) + (TILE_SIZE - 10)
 					px_y := y * TILE_SIZE + i32(track_tiles.y) + (TILE_SIZE - 10)
@@ -135,6 +149,26 @@ ui_draw :: proc() {
 				}
 			}
 		}
+	}
+
+	// Draw the selected tile
+	if game_mem.selected_tile.type != .NONE {
+		dst := rl.Rectangle {
+			track_tiles.x + f32(game_mem.selected_tile.pos_grid.x * TILE_SIZE),
+			track_tiles.y + f32(game_mem.selected_tile.pos_grid.y * TILE_SIZE),
+			TILE_SIZE,
+			TILE_SIZE,
+		}
+		rl.DrawRectangleLinesEx(dst, 1, rl.RED)
+	}
+
+	// draw_horizontal_rule(
+	// 	{track_tiles.x, track_tiles.y + track_tiles.height + 10},
+	// 	f32(track_tiles.width - 0),
+	// )
+
+	for b in buttons {
+		draw_button(b)
 	}
 }
 
@@ -170,10 +204,6 @@ ui_update :: proc() -> bool {
 					pos_px   = {0, 0, TILE_SIZE, TILE_SIZE},
 					type     = .TRACK,
 				}
-
-				// Remove tile from available tiles
-				hash := gen_hash(i32(x), i32(y))
-				tile_nums[hash] -= 1
 			}
 		} else {
 			w.dragging = false
@@ -186,6 +216,14 @@ ui_update :: proc() -> bool {
 				fmt.printfln("in titlebar")
 				w.rec.x = w.drag_start_rec.x + input.mouse.pos_px.x
 				w.rec.y = w.drag_start_rec.y + input.mouse.pos_px.y
+			}
+		}
+
+		for b in buttons {
+			if rl.CheckCollisionPointRec(input.mouse.pos_px, b.pos_px) {
+				if .LEFT in input.mouse.btns {
+					game_mem.state = .SIMULATING
+				}
 			}
 		}
 	}
@@ -376,4 +414,37 @@ ui_window_bottom :: proc(x, y, width, height: f32) {
 		0,
 		rl.WHITE,
 	)
+}
+
+new_button :: proc(x, y: f32, label: string) -> Button {
+	w := rl.MeasureText(fmt.ctprintf("%s", label), UI_FONT_SIZE)
+	return Button {
+		pos_px = {x, y, f32(w) + UI_BUTTON_PADDING, UI_FONT_SIZE + UI_BUTTON_PADDING * 2},
+		label = label,
+	}
+}
+
+draw_button :: proc(b: Button) {
+	pos := rl.Vector2{b.pos_px.x, b.pos_px.y}
+	lbl_pos := pos
+	size := rl.Vector2{b.pos_px.width, b.pos_px.height}
+
+	rl.DrawRectangleV(pos, size, rl.WHITE)
+	rl.DrawRectangleV(pos + {2, 2}, size, rl.BLACK)
+	rl.DrawRectangleV(pos + {2, 2}, size - {4, 4}, rl.GRAY)
+
+	rl.DrawTextEx(
+		font,
+		fmt.ctprintf("%s", b.label),
+		lbl_pos + {UI_BUTTON_PADDING, UI_BUTTON_PADDING},
+		UI_FONT_SIZE,
+		1,
+		rl.BLACK,
+	)
+}
+
+draw_horizontal_rule :: proc(start: rl.Vector2, length: f32) {
+	end := start + {length, 0}
+	rl.DrawLineV(start, end, rl.LIGHTGRAY)
+	rl.DrawLineV(start + {1, 0}, end + {1, 0}, rl.GRAY)
 }
