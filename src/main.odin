@@ -239,7 +239,6 @@ setup :: proc() {
 		// Lookup last tile
 		if i == len(path) - 1 {
 			prev := path[i - 1]
-			// TODO:(lukefilewalker) this will be the village location
 			next := [2]i32{1, 0}
 			on_tile_dir_key, off_tile_dir_key := lookup_tile(prev, this_tile, next)
 			src_px = ts[on_tile_dir_key][off_tile_dir_key]
@@ -398,6 +397,18 @@ update_grid :: proc() {
 					type = game_mem.selected_tile.type,
 				},
 			)
+		}
+	}
+
+	if .RIGHT in input.mouse.btns {
+		if game_mem.selected_tile.type != .NONE {
+			x, y := get_mouse_grid_pos()
+			hash := gen_hash(x, y)
+
+			t := &grid.tiles[hash]
+			t.type = .GRASS
+
+			// TODO:(lukefilewalker) add tile back to tileset UI
 		}
 	}
 }

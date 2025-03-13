@@ -42,6 +42,7 @@ ui_tileset: rl.Texture2D
 windows: [dynamic]Window
 track_tiles: rl.Rectangle
 font: rl.Font
+tile_nums: map[u16]i32
 
 ui_setup :: proc() {
 	ui_tileset = rl.LoadTexture("res/ui.png")
@@ -61,6 +62,14 @@ ui_setup :: proc() {
 	track_tiles.y += UI_TILE_SIZE
 	track_tiles.width = f32(tileset.width * SCALE)
 	track_tiles.height = f32(tileset.height * SCALE)
+
+	// Calculate number of available times
+	tile_nums = make(map[u16]i32)
+	for pt in path_tiles {
+		hash := gen_hash(i32(pt.src_px.x / SRC_TILE_SIZE), i32(pt.src_px.y / SRC_TILE_SIZE))
+		tile_nums[hash] += 1
+	}
+
 }
 
 ui_draw :: proc() {
@@ -88,6 +97,44 @@ ui_draw :: proc() {
 		}
 		rl.DrawRectangleLinesEx(dst, 1, rl.RED)
 		// fmt.printfln("%v %v %v", track_tiles, selected_tile, dst)
+	}
+
+	// Draw tile number indicator
+	// TODO:(lukefilewalker) horrendous perf :((((((
+	i := 0
+	for k, v in tile_nums {
+		// Ignore the last tile
+		// if i == len(tile_nums) - 1 {
+		// 	break
+		// }
+		// i += 1
+
+		for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
+			for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
+				hash := gen_hash(x, y)
+				if hash == k {
+					fmt.printfln("h:%v k:%v v:%v", hash, k, tile_nums[k])
+
+					px_x := x * TILE_SIZE + i32(track_tiles.x) + (TILE_SIZE - 10)
+					px_y := y * TILE_SIZE + i32(track_tiles.y) + (TILE_SIZE - 10)
+
+					rl.DrawCircle(px_x, px_y, 10, rl.RED)
+
+					lbl := fmt.ctprintf("%d", v)
+					lbl_size: f32 = 15
+					lbl_w := rl.MeasureText(lbl, i32(lbl_size))
+
+					rl.DrawTextEx(
+						font,
+						lbl,
+						{f32(px_x) - lbl_size / 4, f32(px_y) - lbl_size / 2},
+						lbl_size,
+						1,
+						rl.BLACK,
+					)
+				}
+			}
+		}
 	}
 }
 
@@ -123,6 +170,10 @@ ui_update :: proc() -> bool {
 					pos_px   = {0, 0, TILE_SIZE, TILE_SIZE},
 					type     = .TRACK,
 				}
+
+				// Remove tile from available tiles
+				hash := gen_hash(i32(x), i32(y))
+				tile_nums[hash] -= 1
 			}
 		} else {
 			w.dragging = false
