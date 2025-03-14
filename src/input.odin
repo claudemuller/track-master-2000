@@ -83,7 +83,3 @@ input_process :: proc(input: ^Input) {
 	input.kb.btns = {}
 	if rl.IsKeyDown(.SPACE) do input.kb.btns += {.SPACE}
 }
-
-btof :: proc(b: bool) -> f32 {
-	return b ? 1.0 : 0.0
-}

@@ -5,7 +5,6 @@ import "core:math"
 import "core:math/rand"
 import "core:mem"
 import "core:os"
-// import "core:os"
 import rl "vendor:raylib"
 
 NUM_TILES_IN_ROW :: 30
@@ -28,35 +27,7 @@ DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
 LEVEL_TIME_LIMIT :: 5 // Seconds
-
-Tile :: struct {
-	pos_grid: rl.Vector2,
-	pos_px:   rl.Rectangle,
-	src_px:   rl.Rectangle,
-	type:     TileType,
-}
-
-Grid :: struct {
-	pos_px: rl.Rectangle,
-	tiles:  map[u16]Tile,
-}
-
-TileType :: enum {
-	NONE, // 0
-	GRASS,
-	TRACK,
-	STATION,
-	TOWN,
-}
-
-GameState :: enum {
-	MAIN_MENU,
-	PLAYING,
-	SIMULATING,
-	WIN,
-	GAME_OVER,
-	EXIT,
-}
+BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
 	selected_tile: Tile,
@@ -67,6 +38,10 @@ game_mem: GameMemory
 input: Input
 camera_shake_duration: f32
 level_end: Timer
+booting: Timer
+booting_sound: rl.Sound
+memctr: f64
+bg_win: Window
 
 grid: Grid
 path: [][2]i32
@@ -77,7 +52,7 @@ tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 station: rl.Texture2D
 town: rl.Texture2D
-bg_win: Window
+dxtrs: rl.Texture2D
 
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
@@ -115,10 +90,13 @@ main :: proc() {
 }
 
 setup :: proc() {
+	rl.InitAudioDevice()
+
+	booting_sound = rl.LoadSound("res/pc-boot.mp3")
+
 	game_mem = {
 		selected_tile = {pos_px = {1, 1, 1, 1}},
 	}
-	game_push_state(.MAIN_MENU)
 
 	bg_win = ui_new_window(
 		"mainwin",
@@ -302,24 +280,21 @@ setup :: proc() {
 	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
 	station = rl.LoadTexture("res/station.png")
 	town = rl.LoadTexture("res/town.png")
+	dxtrs = rl.LoadTexture("res/dxtrs-games-vin.png")
 
 	ui_setup()
-}
 
-game_get_state :: proc() -> GameState {
-	return game_mem.state[0]
-}
-game_get_prev_state :: proc() -> GameState {
-	return game_mem.state[1]
-}
-
-game_push_state :: proc(state: GameState) {
-	temp_state := game_mem.state[0]
-	game_mem.state[0] = state
-	game_mem.state[1] = temp_state
+	boot_game()
 }
 
 update :: proc() {
+	if game_get_state() == .BOOTING {
+		if timer_done(booting) {
+			game_push_state(.MAIN_MENU)
+		}
+		return
+	}
+
 	// TODO:(lukefilewalker) everything else won't get updated if the ui consumes input :(
 	if ui_update() do return
 
@@ -332,6 +307,8 @@ update :: proc() {
 	}
 
 	switch game_get_state() {
+	case .BOOTING:
+
 	case .MAIN_MENU:
 
 	case .PLAYING:
@@ -428,51 +405,101 @@ update :: proc() {
 
 render :: proc() {
 	rl.BeginDrawing()
-	rl.ClearBackground(DOZE_311_BG_COLOUR)
 
-	// Draw main UI window
-	ui_draw_window(bg_win)
+	if game_get_state() == .BOOTING {
+		draw_boot_screen()
+	} else {
+		rl.ClearBackground(DOZE_311_BG_COLOUR)
 
-	src: rl.Rectangle
-	for _, t in grid.tiles {
-		switch t.type {
-		case .TRACK:
-			// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
-			rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
-		// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
+		// Draw main UI window
+		ui_draw_window(bg_win)
 
-		case .GRASS:
-			rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+		src: rl.Rectangle
+		for _, t in grid.tiles {
+			switch t.type {
+			case .TRACK:
+				// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+				rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+			// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
 
-		case .STATION:
-			rl.DrawTexturePro(
-				station,
-				{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
-				t.pos_px,
-				{0, 0},
-				0,
-				rl.WHITE,
-			)
+			case .GRASS:
+				rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
 
-		case .TOWN:
-			rl.DrawTexturePro(
-				town,
-				{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
-				t.pos_px,
-				{0, 0},
-				0,
-				rl.WHITE,
-			)
+			case .STATION:
+				rl.DrawTexturePro(
+					station,
+					{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+					t.pos_px,
+					{0, 0},
+					0,
+					rl.WHITE,
+				)
 
-		case .NONE:
+			case .TOWN:
+				rl.DrawTexturePro(
+					town,
+					{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+					t.pos_px,
+					{0, 0},
+					0,
+					rl.WHITE,
+				)
+
+			case .NONE:
+			}
 		}
+
+		// draw_debug_ui()
+
+		ui_draw()
 	}
 
-	draw_debug_ui()
-
-	ui_draw()
-
 	rl.EndDrawing()
+}
+
+boot_game :: proc() {
+	memctr = rl.GetTime()
+	rl.PlaySound(booting_sound)
+	start_timer(&booting, BOOT_TIME)
+	game_push_state(.BOOTING)
+}
+
+draw_boot_screen :: proc() {
+	rl.ClearBackground(rl.BLACK)
+
+	font_size: i32 = 20
+	txt_colour := rl.Color{170, 170, 170, 255}
+	top_txt := `Dxtrs T-1000 Modular BIOS v1.1, An Awesome Game Company
+Copyright (C) 2020-25, Dxtrs Games, Inc.
+
+%s
+
+
+80486DX2 CPU at 66Mhz
+Memory Test: %d KB`
+
+
+	date_str := "10/01/2025"
+	memctr = rl.GetTime() * 1000 - memctr
+
+	rl.DrawText(
+		fmt.ctprintf(top_txt, date_str, i32(memctr)),
+		WIN_PADDING,
+		WIN_PADDING,
+		font_size,
+		txt_colour,
+	)
+
+	bottom_txt := "Press DEL to enter SETUP\n%s-SYS-2401-A/C/2B"
+	rl.DrawText(
+		fmt.ctprintf(top_txt, date_str),
+		WIN_PADDING,
+		rl.GetScreenHeight() - WIN_PADDING - font_size * 2,
+		font_size,
+		txt_colour,
+	)
+
+	rl.DrawTexture(dxtrs, rl.GetScreenWidth() - dxtrs.width - WIN_PADDING, WIN_PADDING, rl.WHITE)
 }
 
 update_grid :: proc() {
@@ -518,57 +545,6 @@ update_grid :: proc() {
 			tile_nums[hash] += 1
 		}
 	}
-}
-
-check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
-	for i in 0 ..< len(proposed_path) - 1 {
-		if proposed_path[i].pos_grid != path[i].pos_grid ||
-		   proposed_path[i].src_px != path[i].src_px ||
-		   proposed_path[i].type != path[i].type {
-			game_push_state(.GAME_OVER)
-			camera_shake_duration = CAMERA_SHAKE_DURATION
-		}
-	}
-	game_push_state(.GAME_OVER)
-}
-
-lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
-	on_tile_dir := this_tile - prev
-	off_tile_dir := next - this_tile
-
-	on_tile_dir_key: Direction
-	if on_tile_dir == {1, 0} || on_tile_dir == {2, 0} {
-		on_tile_dir_key = .RIGHT
-	} else if on_tile_dir == {-1, 0} || on_tile_dir == {-2, 0} {
-		on_tile_dir_key = .LEFT
-	} else if on_tile_dir == {0, 1} || on_tile_dir == {0, 2} {
-		on_tile_dir_key = .DOWN
-	} else if on_tile_dir == {0, -1} || on_tile_dir == {0, -2} {
-		on_tile_dir_key = .UP
-	}
-
-	off_tile_dir_key: Direction
-	if off_tile_dir == {1, 0} || off_tile_dir == {2, 0} {
-		off_tile_dir_key = .RIGHT
-	} else if off_tile_dir == {-1, 0} || off_tile_dir == {-2, 0} {
-		off_tile_dir_key = .LEFT
-	} else if off_tile_dir == {0, 1} || off_tile_dir == {0, 2} {
-		off_tile_dir_key = .DOWN
-	} else if off_tile_dir == {0, -1} || off_tile_dir == {0, -2} {
-		off_tile_dir_key = .UP
-	}
-
-	return on_tile_dir_key, off_tile_dir_key
-}
-
-get_mouse_grid_pos :: proc() -> (i32, i32) {
-	x := math.floor_f32(f32(i32(input.mouse.pos_px.x) - tile_x_offset) / TILE_SIZE)
-	y := math.floor_f32(f32(i32(input.mouse.pos_px.y) - tile_y_offset) / TILE_SIZE)
-	return i32(x), i32(y)
-}
-
-gen_hash :: proc(x, y: i32) -> u16 {
-	return u16(((x * 73856093) + (y * 19349663)) % 65536)
 }
 
 draw_debug_ui :: proc() {
