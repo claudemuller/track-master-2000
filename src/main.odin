@@ -134,8 +134,8 @@ setup :: proc() {
 		UI_BG_GRAY,
 	)
 	bg_win.ctrl_buttons.close.on_click = proc() {
-		game_mem.state = .EXIT
 		fmt.println("exting")
+		game_mem.state = .EXIT
 	}
 
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
@@ -308,6 +308,14 @@ setup :: proc() {
 update :: proc() {
 	// TODO:(lukefilewalker) everything else won't get updated if the ui consumes input :(
 	if ui_update() do return
+
+	if .LEFT in input.mouse.btns {
+		if rl.CheckCollisionPointRec(input.mouse.pos_px, bg_win.ctrl_buttons.close.pos_px) {
+			if bg_win.ctrl_buttons.close.on_click != nil {
+				bg_win.ctrl_buttons.close.on_click()
+			}
+		}
+	}
 
 	switch game_mem.state {
 	case .MAIN_MENU:

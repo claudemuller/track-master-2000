@@ -195,12 +195,12 @@ ui_draw :: proc() {
 }
 
 ui_update :: proc() -> bool {
+	handled: bool
+
 	for &w in windows {
 		if !rl.CheckCollisionPointRec(input.mouse.pos_px, w.rec) {
 			continue
 		}
-
-		fmt.printfln("%s", w.title)
 
 		if .LEFT in input.mouse.btns {
 			// w.dragging = true
@@ -241,6 +241,8 @@ ui_update :: proc() -> bool {
 					type     = .TRACK,
 				}
 			}
+
+			handled = true
 		} else {
 			w.dragging = false
 		}
@@ -256,7 +258,7 @@ ui_update :: proc() -> bool {
 		}
 	}
 
-	return true
+	return handled
 }
 
 ui_new_window :: proc(
