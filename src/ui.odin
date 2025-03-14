@@ -73,7 +73,6 @@ ui_setup :: proc() {
 		) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = tt_win_width,
 	}
-	// pos_px = rl.Rectangle{x = 1678, y = 242, width = 96, height = 42},
 	tt_btns: [dynamic]Button
 	append(
 		&tt_btns,
@@ -109,51 +108,14 @@ ui_setup :: proc() {
 
 	// Calculate number of available times
 	tile_nums = make(map[u16]i32)
-	for pt in path_tiles {
-		hash := gen_hash(i32(pt.src_px.x / SRC_TILE_SIZE), i32(pt.src_px.y / SRC_TILE_SIZE))
+	for i in 0 ..< len(path_nodes) - 1 {
+		hash := gen_hash(
+			i32(path_nodes[i].src_px.x / SRC_TILE_SIZE),
+			i32(path_nodes[i].src_px.y / SRC_TILE_SIZE),
+		)
 		tile_nums[hash] += 1
+		// fmt.printfln("pn:%v hash:%v n:%d", path_nodes[i], hash, tile_nums[hash])
 	}
-
-	// Create welcome window
-	w_win_width: f32 = 500
-	w_win_rec := rl.Rectangle {
-		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
-		y      = f32(300 + WIN_PADDING * 1.5),
-		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
-		width  = w_win_width,
-	}
-	w_txt := fmt.ctprintf(
-		`Welcome
-
-Track Master 2000 is highly advanced train TRAVEL
-simulation software used by thousands of
-municipalities across the world to ensure the safe
-travel of millions.
-
-Your task is to use the tracks provided to map out
-a route for the train to reach the town. You have
-%d minutes to complete the task after which the
-simulation will begin. Alternatively, click
-the SIMULATE button to run the simulation early.
-
-Good luck`,
-		LEVEL_TIME_LIMIT / 60,
-	)
-	welcome_win := ui_new_window(
-		"welcomewin",
-		"Welcome",
-		w_win_rec,
-		w_txt,
-		[dynamic]Button{},
-		UI_WINDOW_PADDING,
-		UI_BG_GRAY,
-	)
-	welcome_win.ctrl_buttons.close.on_click = proc() {
-		append(&window_remove_queue, "welcomewin")
-		game_push_state(.PLAYING)
-	}
-
-	append(&windows, welcome_win)
 }
 
 ui_draw :: proc() {
@@ -172,48 +134,51 @@ ui_draw :: proc() {
 	)
 
 	// Draw tile number indicator
-	// TODO:(lukefilewalker) horrendous perf :((((((
-	i := 0
-	for k, v in tile_nums {
-		// Ignore the last tile
-		// if i == len(tile_nums) - 1 {
-		// 	break
-		// }
-		// i += 1
+	if game_get_state() == .PLAYING {
+		// TODO:(lukefilewalker) horrendous perf :((((((
+		i := 0
+		for k, v in tile_nums {
+			// Ignore the last tile
+			// if i == len(tile_nums) - 1 {
+			// 	break
+			// }
+			// i += 1
 
-		for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
-			for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
-				hash := gen_hash(x, y)
+			for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
+				for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
+					hash := gen_hash(x, y)
 
-				// Draw tile outlines
-				dst := rl.Rectangle {
-					f32(x) * TILE_SIZE + track_tiles.x,
-					f32(y) * TILE_SIZE + track_tiles.y,
-					TILE_SIZE,
-					TILE_SIZE,
-				}
-				rl.DrawRectangleLinesEx(dst, 1, rl.GRAY)
+					// Draw tile outlines
+					dst := rl.Rectangle {
+						f32(x) * TILE_SIZE + track_tiles.x,
+						f32(y) * TILE_SIZE + track_tiles.y,
+						TILE_SIZE,
+						TILE_SIZE,
+					}
+					rl.DrawRectangleLinesEx(dst, 1, rl.GRAY)
 
-				if hash == k {
-					// fmt.printfln("h:%v k:%v v:%v", hash, k, tile_nums[k])
+					// Draw number of tiles left
+					if v > 0 {
+						if hash == k {
+							px_x := x * TILE_SIZE + i32(track_tiles.x) + (TILE_SIZE - 10)
+							px_y := y * TILE_SIZE + i32(track_tiles.y) + (TILE_SIZE - 10)
 
-					px_x := x * TILE_SIZE + i32(track_tiles.x) + (TILE_SIZE - 10)
-					px_y := y * TILE_SIZE + i32(track_tiles.y) + (TILE_SIZE - 10)
+							rl.DrawCircle(px_x, px_y, 10, rl.RED)
 
-					rl.DrawCircle(px_x, px_y, 10, rl.RED)
+							lbl := fmt.ctprintf("%d", v)
+							lbl_size: f32 = 15
+							lbl_w := rl.MeasureText(lbl, i32(lbl_size))
 
-					lbl := fmt.ctprintf("%d", v)
-					lbl_size: f32 = 15
-					lbl_w := rl.MeasureText(lbl, i32(lbl_size))
-
-					rl.DrawTextEx(
-						font,
-						lbl,
-						{f32(px_x) - lbl_size / 4, f32(px_y) - lbl_size / 2},
-						lbl_size,
-						1,
-						rl.BLACK,
-					)
+							rl.DrawTextEx(
+								font,
+								lbl,
+								{f32(px_x) - lbl_size / 4, f32(px_y) - lbl_size / 2},
+								lbl_size,
+								1,
+								rl.BLACK,
+							)
+						}
+					}
 				}
 			}
 		}
@@ -419,13 +384,6 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 		0,
 		rl.WHITE,
 	)
-
-	// Debug
-	// rl.DrawRectangleLinesEx(
-	// 	{x + width - UI_BUTTON_TILE_SIZE - 10, y + 10, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
-	// 	1,
-	// 	rl.RED,
-	// )
 }
 
 ui_window_middle :: proc(x, y, width, height: f32, bg_colour: rl.Color) {
@@ -564,9 +522,6 @@ ui_draw_button :: proc(b: Button) {
 		1,
 		rl.BLACK,
 	)
-
-	// Debug
-	// rl.DrawRectangleLinesEx({pos.x, pos.y, size.x, size.y}, 1, rl.RED)
 }
 
 ui_draw_countdown_timer :: proc() {

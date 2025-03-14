@@ -64,6 +64,11 @@ check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 		if proposed_path[i].pos_grid != path[i].pos_grid ||
 		   proposed_path[i].src_px != path[i].src_px ||
 		   proposed_path[i].type != path[i].type {
+			// fmt.printfln("%v - %v", proposed_path[i].pos_grid, path[i].pos_grid)
+			// fmt.printfln("%v - %v", proposed_path[i].src_px, path[i].src_px)
+			// fmt.printfln("%v - %v", proposed_path[i].type, path[i].type)
+			fmt.printfln("%v\n%v", proposed_path, path)
+
 			camera_shake_duration = CAMERA_SHAKE_DURATION
 			game_push_state(.GAME_OVER)
 			return

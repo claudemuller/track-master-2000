@@ -26,7 +26,7 @@ CAMERA_SHAKE_DURATION :: 15
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
-LEVEL_TIME_LIMIT :: 5 // Seconds
+LEVEL_TIME_LIMIT :: 30 // Seconds
 BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
@@ -45,7 +45,7 @@ bg_win: Window
 
 grid: Grid
 path: [][2]i32
-path_tiles: [dynamic]Tile
+path_nodes: [dynamic]Tile
 proposed_path: [dynamic]Tile
 
 tileset: rl.Texture2D
@@ -221,7 +221,7 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path_len: i32 = 3
+	path_len: i32 = 4
 	path = gen_path({0, 1}, path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
@@ -235,9 +235,14 @@ setup :: proc() {
 			next := path[i + 1]
 			off_tile_dir := next - this_tile
 			if off_tile_dir == {0, 1} {
+				fmt.printfln("prev:%v next:%v {0, 1}", prev, next)
 				src_px = ts[Direction.DOWN][Direction.DOWN]
+				// } else if off_tile_dir == {1, 1} {
+				// 	fmt.println("%v %v {0, 1}", prev, next)
+				// 	src_px = ts[Direction.RIGHT][Direction.RIGHT]
 			} else if off_tile_dir == {1, 0} {
-				src_px = ts[Direction.RIGHT][Direction.RIGHT]
+				fmt.printfln("prev:%v next:%v {1, 0}", prev, next)
+				src_px = ts[Direction.DOWN][Direction.RIGHT]
 			}
 		}
 
@@ -270,7 +275,7 @@ setup :: proc() {
 			type     = .TRACK,
 		}
 		// grid.tiles[hash] = t
-		append(&path_tiles, t)
+		append(&path_nodes, t)
 	}
 
 	town_tile := &grid.tiles[hash]
@@ -283,6 +288,47 @@ setup :: proc() {
 	dxtrs = rl.LoadTexture("res/dxtrs-games-vin.png")
 
 	ui_setup()
+
+	// Create welcome window
+	w_win_width: f32 = 500
+	w_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
+		y      = f32(300 + WIN_PADDING * 1.5),
+		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		width  = w_win_width,
+	}
+	w_txt := fmt.ctprintf(
+		`Welcome
+
+Track Master 2000 is highly advanced train TRAVEL
+simulation software used by thousands of
+municipalities across the world to ensure the safe
+travel of millions.
+
+Your task is to use the tracks provided to map out
+a route for the train to reach the town. You have
+%d minutes to complete the task after which the
+simulation will begin. Alternatively, click
+the SIMULATE button to run the simulation early.
+
+Good luck`,
+		LEVEL_TIME_LIMIT / 60,
+	)
+	welcome_win := ui_new_window(
+		"welcomewin",
+		"Welcome",
+		w_win_rec,
+		w_txt,
+		[dynamic]Button{},
+		UI_WINDOW_PADDING,
+		UI_BG_GRAY,
+	)
+	welcome_win.ctrl_buttons.close.on_click = proc() {
+		append(&window_remove_queue, "welcomewin")
+		game_push_state(.PLAYING)
+	}
+
+	append(&windows, welcome_win)
 
 	boot_game()
 }
@@ -314,6 +360,7 @@ update :: proc() {
 	case .PLAYING:
 		if game_get_prev_state() == .MAIN_MENU {
 			start_timer(&level_end, LEVEL_TIME_LIMIT)
+			// Push PLAYING to drop MAIN_MENU for next frame
 			game_push_state(.PLAYING)
 		}
 
@@ -337,7 +384,7 @@ update :: proc() {
 		}
 
 	case .SIMULATING:
-		check_path(path_tiles, proposed_path)
+		check_path(path_nodes, proposed_path)
 
 	// if camera_shake_duration > 0 {
 	// 	camera.offset.x = f32(
@@ -417,36 +464,48 @@ render :: proc() {
 
 		src: rl.Rectangle
 		for _, t in grid.tiles {
-			switch t.type {
-			case .TRACK:
-				// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
-				rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
-			// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
+			// TODO:(claude) this is ugly
+			// if game_get_state() == .MAIN_MENU ||
+			//    game_get_state() == .WIN ||
+			//    game_get_state() == .GAME_OVER {
+			rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+			// }
 
-			case .GRASS:
-				rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+			// TODO:(claude) this is ugly
+			if game_get_state() == .PLAYING ||
+			   game_get_state() == .WIN ||
+			   game_get_state() == .GAME_OVER {
+				switch t.type {
+				case .TRACK:
+					// rl.DrawRectangleRec(t.pos_px, rl.GRAY)
+					rl.DrawTexturePro(tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
+				// rl.DrawRectangleLinesEx(t.pos_px, 1, t.colour)
 
-			case .STATION:
-				rl.DrawTexturePro(
-					station,
-					{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
-					t.pos_px,
-					{0, 0},
-					0,
-					rl.WHITE,
-				)
+				case .GRASS:
+					rl.DrawTexturePro(grass_tileset, t.src_px, t.pos_px, {0, 0}, 0, rl.WHITE)
 
-			case .TOWN:
-				rl.DrawTexturePro(
-					town,
-					{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
-					t.pos_px,
-					{0, 0},
-					0,
-					rl.WHITE,
-				)
+				case .STATION:
+					rl.DrawTexturePro(
+						station,
+						{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+						t.pos_px,
+						{0, 0},
+						0,
+						rl.WHITE,
+					)
 
-			case .NONE:
+				case .TOWN:
+					rl.DrawTexturePro(
+						town,
+						{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE},
+						t.pos_px,
+						{0, 0},
+						0,
+						rl.WHITE,
+					)
+
+				case .NONE:
+				}
 			}
 		}
 
@@ -538,7 +597,11 @@ update_grid :: proc() {
 			)
 
 			// Remove tile from available tiles
-			tile_nums[hash] -= 1
+			selected_hash := gen_hash(
+				i32(game_mem.selected_tile.pos_grid.x),
+				i32(game_mem.selected_tile.pos_grid.y),
+			)
+			tile_nums[selected_hash] -= 1
 		}
 	}
 
@@ -551,7 +614,11 @@ update_grid :: proc() {
 			t.type = .GRASS
 
 			// Put tile back into available tiles
-			tile_nums[hash] += 1
+			selected_hash := gen_hash(
+				i32(game_mem.selected_tile.pos_grid.x),
+				i32(game_mem.selected_tile.pos_grid.y),
+			)
+			tile_nums[selected_hash] += 1
 		}
 	}
 }
