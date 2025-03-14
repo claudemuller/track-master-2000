@@ -57,6 +57,7 @@ check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 	if len(proposed_path) <= 0 {
 		camera_shake_duration = CAMERA_SHAKE_DURATION
 		game_push_state(.GAME_OVER)
+		return
 	}
 
 	for i in 0 ..< len(proposed_path) {
