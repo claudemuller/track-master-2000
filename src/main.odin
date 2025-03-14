@@ -108,7 +108,7 @@ setup :: proc() {
 			f32(rl.GetScreenHeight()) - WIN_PADDING * 2,
 		},
 		"",
-		[]Button{},
+		[dynamic]Button{},
 		0,
 		UI_BG_GRAY,
 	)
@@ -221,7 +221,7 @@ setup :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path_len: i32 = 100
+	path_len: i32 = 3
 	path = gen_path({0, 1}, path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
@@ -333,8 +333,9 @@ update :: proc() {
 
 		// Level time is up, check path
 		if timer_done(level_end) {
-			check_path(path_tiles, proposed_path)
+			game_push_state(.SIMULATING)
 		}
+
 	case .SIMULATING:
 		check_path(path_tiles, proposed_path)
 
@@ -349,6 +350,7 @@ update :: proc() {
 	// } else {
 	// 	camera.offset = {0, 0}
 	// }
+
 	case .WIN:
 		w_win_width: f32 = 500
 		w_win_rec := rl.Rectangle {
@@ -357,14 +359,14 @@ update :: proc() {
 			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 			width  = w_win_width,
 		}
-		w_btns := []Button{}
+		w_btns := [1]Button{}
 		w_txt := fmt.ctprint("You win :)")
 		w_win := ui_new_window(
 			"winwin",
 			"Win",
 			w_win_rec,
 			w_txt,
-			w_btns,
+			[dynamic]Button{},
 			UI_WINDOW_PADDING,
 			UI_BG_GRAY,
 		)
@@ -382,14 +384,13 @@ update :: proc() {
 			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 			width  = go_win_width,
 		}
-		go_btns := []Button{}
 		go_txt := fmt.ctprint("Everyone died :(")
 		go_win := ui_new_window(
 			"gameoverwin",
 			"Death to all",
 			go_win_rec,
 			go_txt,
-			go_btns,
+			[dynamic]Button{},
 			UI_WINDOW_PADDING,
 			UI_BG_GRAY,
 		)
@@ -458,16 +459,17 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	memctr = rl.GetTime()
-	rl.PlaySound(booting_sound)
-	start_timer(&booting, BOOT_TIME)
-	game_push_state(.BOOTING)
+	// memctr = rl.GetTime()
+	// rl.PlaySound(booting_sound)
+	// start_timer(&booting, BOOT_TIME)
+	// game_push_state(.BOOTING)
+	game_push_state(.MAIN_MENU)
 }
 
 draw_boot_screen :: proc() {
 	rl.ClearBackground(rl.BLACK)
 
-	font_size: i32 = 20
+	font_size: f32 = 22
 	txt_colour := rl.Color{170, 170, 170, 255}
 	top_txt := `Dxtrs T-1000 Modular BIOS v1.1, An Awesome Game Company
 Copyright (C) 2020-25, Dxtrs Games, Inc.
@@ -479,23 +481,25 @@ Copyright (C) 2020-25, Dxtrs Games, Inc.
 Memory Test: %d KB`
 
 
-	date_str := "10/01/2025"
+	date_str := "15/03/2025"
 	memctr = rl.GetTime() * 1000 - memctr
 
-	rl.DrawText(
+	rl.DrawTextEx(
+		font,
 		fmt.ctprintf(top_txt, date_str, i32(memctr)),
-		WIN_PADDING * 2,
-		WIN_PADDING * 2,
+		{WIN_PADDING * 2, WIN_PADDING * 2},
 		font_size,
+		1,
 		txt_colour,
 	)
 
 	bottom_txt := "Press DEL to enter SETUP\n%s-SYS-2401-A/C/2B"
-	rl.DrawText(
+	rl.DrawTextEx(
+		font,
 		fmt.ctprintf(bottom_txt, date_str),
-		WIN_PADDING * 2,
-		rl.GetScreenHeight() - WIN_PADDING * 2 - font_size * 2,
+		{WIN_PADDING * 2, f32(rl.GetScreenHeight()) - WIN_PADDING * 2 - font_size * 2},
 		font_size,
+		1,
 		txt_colour,
 	)
 

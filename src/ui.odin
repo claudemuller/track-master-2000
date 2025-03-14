@@ -19,7 +19,7 @@ UI_BUTTON_PADDING :: 10
 UI_WINDOW_PADDING :: 10
 
 UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
-UI_FONT_SIZE :: 20
+UI_FONT_SIZE :: 22
 
 Window :: struct {
 	id:             string,
@@ -33,7 +33,7 @@ Window :: struct {
 		maximise: Button,
 		minimise: Button,
 	},
-	buttons:        []Button,
+	buttons:        [dynamic]Button,
 	text:           cstring,
 	bg_colour:      rl.Color,
 	padding:        f32,
@@ -48,12 +48,12 @@ Button :: struct {
 }
 
 ButtonType :: enum {
+	NONE,
 	CLOSE,
 }
 
 ui_tileset: rl.Texture2D
 windows: [dynamic]Window
-buttons: [dynamic]Button
 track_tiles: rl.Rectangle
 font: rl.Font
 tile_nums: map[u16]i32
@@ -73,7 +73,19 @@ ui_setup :: proc() {
 		) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = tt_win_width,
 	}
-	tt_btns := []Button{ui_new_button(0, track_tiles.height + 10, tt_win_rec, "Simulate", nil)}
+	// pos_px = rl.Rectangle{x = 1678, y = 242, width = 96, height = 42},
+	tt_btns: [dynamic]Button
+	append(
+		&tt_btns,
+		ui_new_button(
+			SRC_UI_BORDER_TILE_SIZE,
+			f32(tileset.height) + 110,
+			tt_win_rec,
+			"Simulate",
+			proc() {game_push_state(.SIMULATING)},
+		),
+	)
+
 	track_tiles_win := ui_new_window(
 		"trackpieces",
 		"Track pieces",
@@ -110,9 +122,21 @@ ui_setup :: proc() {
 		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = w_win_width,
 	}
-	w_btns := []Button{}
 	w_txt := fmt.ctprintf(
-		"Welcome\n\nTrack Master 2000 is highly advanced train TRAVEL\nsimulation software used by thousands of municipalities\nacross the world to ensure the safe travel of millions.\n\nYour task is to use the tracks provided to map out a\nroute for the train to reach the town. You have %d\nminutes to complete the task after which the simulation\nwill begin. Alternatively, click the SIMULATE button\nto run the simulation early.\n\nGood luck",
+		`Welcome
+
+Track Master 2000 is highly advanced train TRAVEL
+simulation software used by thousands of
+municipalities across the world to ensure the safe
+travel of millions.
+
+Your task is to use the tracks provided to map out
+a route for the train to reach the town. You have
+%d minutes to complete the task after which the
+simulation will begin. Alternatively, click
+the SIMULATE button to run the simulation early.
+
+Good luck`,
 		LEVEL_TIME_LIMIT / 60,
 	)
 	welcome_win := ui_new_window(
@@ -120,7 +144,7 @@ ui_setup :: proc() {
 		"Welcome",
 		w_win_rec,
 		w_txt,
-		w_btns,
+		[dynamic]Button{},
 		UI_WINDOW_PADDING,
 		UI_BG_GRAY,
 	)
@@ -285,7 +309,7 @@ ui_new_window :: proc(
 	title: string,
 	rec: rl.Rectangle,
 	text: cstring,
-	buttons: []Button,
+	buttons: [dynamic]Button,
 	padding: f32,
 	bg_colour: rl.Color,
 ) -> Window {
@@ -342,7 +366,7 @@ ui_draw_window :: proc(win: Window) {
 		rl.BLACK,
 	)
 
-	for b in buttons {
+	for b in win.buttons {
 		ui_draw_button(b)
 	}
 }
@@ -504,12 +528,17 @@ ui_window_bottom :: proc(x, y, width, height: f32) {
 	)
 }
 
-ui_new_button :: proc(x, y: f32, win: rl.Rectangle, label: string, on_click: proc()) -> Button {
+ui_new_button :: proc(
+	x, y: f32,
+	win_rec: rl.Rectangle,
+	label: string,
+	on_click: proc(),
+) -> Button {
 	w := rl.MeasureText(fmt.ctprintf("%s", label), UI_FONT_SIZE)
 	return Button {
 		pos_px = {
-			win.x + UI_BUTTON_PADDING + x,
-			win.y + y,
+			win_rec.x + UI_BUTTON_PADDING + x,
+			win_rec.y + y,
 			f32(w) + UI_BUTTON_PADDING,
 			UI_FONT_SIZE + UI_BUTTON_PADDING * 2,
 		},
@@ -537,22 +566,23 @@ ui_draw_button :: proc(b: Button) {
 	)
 
 	// Debug
-	rl.DrawRectangleLinesEx({pos.x, pos.y, size.x, size.y}, 1, rl.RED)
+	// rl.DrawRectangleLinesEx({pos.x, pos.y, size.x, size.y}, 1, rl.RED)
 }
 
 ui_draw_countdown_timer :: proc() {
 	// Draw countdown
-	countdown_size: i32 = 25
+	countdown_size: i32 = 28
 	countdown_txt := fmt.ctprintf(
-		"Imminent danger in: %d",
-		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)),
+		"Simulation starts in: %d",
+		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)) + 1,
 	)
 	txt_w := rl.MeasureText(countdown_txt, countdown_size)
 	txt_h: i32 = 50
 	txt_x := rl.GetScreenWidth() / 2 - txt_w / 2
 	txt_y := tile_y_offset + 10
+
 	rl.DrawRectangle(txt_x - 20, txt_y - 10, txt_w + 40, txt_h, rl.BLACK - {0, 0, 0, 100})
-	rl.DrawText(countdown_txt, txt_x, txt_y, countdown_size, rl.RED)
+	rl.DrawTextEx(font, countdown_txt, {f32(txt_x), f32(txt_y)}, f32(countdown_size), 1, rl.RED)
 }
 
 ui_draw_horizontal_rule :: proc(start: rl.Vector2, length: f32) {

@@ -54,23 +54,22 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 }
 
 check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
-	fmt.printfln("%d", proposed_path)
-
 	if len(proposed_path) <= 0 {
 		camera_shake_duration = CAMERA_SHAKE_DURATION
 		game_push_state(.GAME_OVER)
 	}
 
-	for i in 0 ..< len(proposed_path) - 1 {
+	for i in 0 ..< len(proposed_path) {
 		if proposed_path[i].pos_grid != path[i].pos_grid ||
 		   proposed_path[i].src_px != path[i].src_px ||
 		   proposed_path[i].type != path[i].type {
 			camera_shake_duration = CAMERA_SHAKE_DURATION
 			game_push_state(.GAME_OVER)
+			return
 		}
 	}
 
-	game_push_state(.GAME_OVER)
+	game_push_state(.WIN)
 }
 
 get_mouse_grid_pos :: proc() -> (i32, i32) {
