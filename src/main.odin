@@ -55,6 +55,7 @@ GameState :: enum {
 	SIMULATING,
 	WIN,
 	GAME_OVER,
+	EXIT,
 }
 
 GameMemory :: struct {
@@ -76,6 +77,7 @@ tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
 station: rl.Texture2D
 town: rl.Texture2D
+bg_win: Window
 
 tile_x_offset: i32 = UI_BORDER_TILE_SIZE + WIN_PADDING
 tile_y_offset: i32 = UI_TILE_SIZE + WIN_PADDING
@@ -95,7 +97,7 @@ main :: proc() {
 		mem.tracking_allocator_destroy(&track)
 	}
 
-	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Track Master 2000™")
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Track Master 2000")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(500)
 	rl.SetExitKey(.ESCAPE)
@@ -103,6 +105,9 @@ main :: proc() {
 	setup()
 
 	for !rl.WindowShouldClose() {
+		if game_mem.state == .EXIT {
+			break
+		}
 		input_process(&input)
 		update()
 		render()
@@ -112,6 +117,25 @@ main :: proc() {
 setup :: proc() {
 	game_mem = {
 		selected_tile = {pos_px = {1, 1, 1, 1}},
+		state = .MAIN_MENU,
+	}
+
+	bg_win = ui_new_window(
+		"Track Master 2000",
+		rl.Rectangle {
+			20,
+			20,
+			f32(rl.GetScreenWidth()) - WIN_PADDING * 2,
+			f32(rl.GetScreenHeight()) - WIN_PADDING * 2,
+		},
+		"",
+		[]Button{},
+		0,
+		UI_BG_GRAY,
+	)
+	bg_win.ctrl_buttons.close.on_click = proc() {
+		game_mem.state = .EXIT
+		fmt.println("exting")
 	}
 
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
@@ -125,6 +149,7 @@ setup :: proc() {
 		tiles = make(map[u16]Tile, tot_num_tiles),
 	}
 
+	// Create the grid of tiles
 	for y in 0 ..< i32(NUM_TILES_IN_COL) {
 		for x in 0 ..< i32(NUM_TILES_IN_ROW) {
 			hash := gen_hash(x, y)
@@ -278,9 +303,6 @@ setup :: proc() {
 	town = rl.LoadTexture("res/town.png")
 
 	ui_setup()
-	game_mem.state = .MAIN_MENU
-
-	start_timer(&level_end, LEVEL_TIME_LIMIT)
 }
 
 update :: proc() {
@@ -289,6 +311,9 @@ update :: proc() {
 
 	switch game_mem.state {
 	case .MAIN_MENU:
+		// if play is pressed
+		start_timer(&level_end, LEVEL_TIME_LIMIT)
+
 	case .PLAYING:
 		update_grid()
 
@@ -323,7 +348,12 @@ update :: proc() {
 	// 	camera.offset = {0, 0}
 	// }
 	case .WIN:
+	// Show winning screen
+
 	case .GAME_OVER:
+	// Show game over screen
+
+	case .EXIT:
 	}
 }
 
@@ -332,16 +362,7 @@ render :: proc() {
 	rl.ClearBackground(DOZE_311_BG_COLOUR)
 
 	// Draw main UI window
-	ui_draw_window(
-		"Track Master 2000",
-		rl.Rectangle {
-			20,
-			20,
-			f32(rl.GetScreenWidth()) - WIN_PADDING * 2,
-			f32(rl.GetScreenHeight()) - WIN_PADDING * 2,
-		},
-		UI_BG_GRAY,
-	)
+	ui_draw_window(bg_win)
 
 	src: rl.Rectangle
 	for _, t in grid.tiles {
@@ -378,21 +399,9 @@ render :: proc() {
 		}
 	}
 
-	// Draw countdown
-	countdown_size: i32 = 25
-	countdown_txt := fmt.ctprintf(
-		"Imminent danger in: %d",
-		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)),
-	)
-	txt_w := rl.MeasureText(countdown_txt, countdown_size)
-	txt_h: i32 = 50
-	txt_x := rl.GetScreenWidth() / 2 - txt_w / 2
-	txt_y := tile_y_offset + 10
-	rl.DrawRectangle(txt_x - 20, txt_y - 10, txt_w + 40, txt_h, rl.BLACK - {0, 0, 0, 100})
-	rl.DrawText(countdown_txt, txt_x, txt_y, countdown_size, rl.RED)
+	// draw_debug_ui()
 
 	ui_draw()
-	draw_debug_ui()
 
 	rl.EndDrawing()
 }
@@ -454,19 +463,6 @@ check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 	game_mem.state = .WIN
 }
 
-draw_debug_ui :: proc() {
-	rl.DrawText(fmt.ctprintf("%v", get_elapsed(level_end)), 10, 10, 20, rl.BLACK)
-
-	i := 0
-	for t in path {
-		x := t.x * TILE_SIZE + tile_x_offset
-		y := t.y * TILE_SIZE + tile_y_offset
-		rl.DrawRectangleLines(x, y, TILE_SIZE, TILE_SIZE, rl.PINK)
-		rl.DrawText(fmt.ctprint(i), x, y, 25, rl.BLACK)
-		i += 1
-	}
-}
-
 lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 	on_tile_dir := this_tile - prev
 	off_tile_dir := next - this_tile
@@ -504,4 +500,17 @@ get_mouse_grid_pos :: proc() -> (i32, i32) {
 
 gen_hash :: proc(x, y: i32) -> u16 {
 	return u16(((x * 73856093) + (y * 19349663)) % 65536)
+}
+
+draw_debug_ui :: proc() {
+	rl.DrawText(fmt.ctprintf("%v", get_elapsed(level_end)), 10, 10, 20, rl.BLACK)
+
+	i := 0
+	for t in path {
+		x := t.x * TILE_SIZE + tile_x_offset
+		y := t.y * TILE_SIZE + tile_y_offset
+		rl.DrawRectangleLines(x, y, TILE_SIZE, TILE_SIZE, rl.PINK)
+		rl.DrawText(fmt.ctprint(i), x, y, 25, rl.BLACK)
+		i += 1
+	}
 }

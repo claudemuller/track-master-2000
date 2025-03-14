@@ -16,6 +16,7 @@ UI_BUTTON_TILE_SIZE :: SRC_UI_BUTTON_TILE_SIZE * SCALE
 UI_HORIZONTAL_RULE_SIZE :: 20
 UI_BUTTON_SIZE :: 40
 UI_BUTTON_PADDING :: 10
+UI_WINDOW_PADDING :: 10
 
 UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
 UI_FONT_SIZE :: 20
@@ -25,11 +26,17 @@ Window :: struct {
 	rec:            rl.Rectangle,
 	drag_start_rec: rl.Rectangle,
 	dragging:       bool,
-	buttons:        struct {
+	// TODO:(lukefilewalker) bitset rather?
+	ctrl_buttons:   struct {
 		close:    Button,
 		maximise: Button,
 		minimise: Button,
 	},
+	buttons:        []Button,
+	text:           string,
+	bg_colour:      rl.Color,
+	padding:        f32,
+	has_shadow:     bool,
 }
 
 Button :: struct {
@@ -54,16 +61,20 @@ ui_setup :: proc() {
 	ui_tileset = rl.LoadTexture("res/ui.png")
 	font = rl.LoadFont("res/VT323-Regular.ttf")
 
-	win_width := f32(tileset.width * SCALE) + UI_BORDER_TILE_SIZE * 2
-	win_rec := rl.Rectangle {
-		x      = f32(rl.GetScreenWidth()) - win_width - WIN_PADDING * 2,
+	// Create track tiles window
+	tt_win_width := f32(tileset.width * SCALE) + UI_BORDER_TILE_SIZE * 2
+	tt_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth()) - tt_win_width - WIN_PADDING * 2,
 		y      = f32(UI_TILE_SIZE + WIN_PADDING * 1.5),
 		height = f32(
 			tileset.height * SCALE,
 		) + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
-		width  = win_width,
+		width  = tt_win_width,
 	}
-	append(&windows, ui_new_window("Track pieces", win_rec))
+	tt_btns := []Button{ui_new_button(0, track_tiles.height + 10, tt_win_rec, "Simulate", nil)}
+	track_tiles_win := ui_new_window("Track pieces", tt_win_rec, "", tt_btns, 0, UI_BG_GRAY)
+
+	append(&windows, track_tiles_win)
 
 	track_tiles = windows[0].rec
 	track_tiles.x += UI_BORDER_TILE_SIZE
@@ -78,19 +89,35 @@ ui_setup :: proc() {
 		tile_nums[hash] += 1
 	}
 
-	append(
-		&buttons,
-		new_button(
-			track_tiles.x + UI_BUTTON_PADDING,
-			track_tiles.y + track_tiles.height + 10,
-			"Simulate",
-		),
+	// Create welcome window
+	w_win_width: f32 = 500
+	w_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth()) - w_win_width - WIN_PADDING * 2,
+		y      = f32(300 + WIN_PADDING * 1.5),
+		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		width  = w_win_width,
+	}
+	w_btns := []Button{}
+	w_txt := "Welcome to Track Master 2000"
+	welcome_win := ui_new_window(
+		"Welcome",
+		w_win_rec,
+		w_txt,
+		w_btns,
+		UI_WINDOW_PADDING,
+		UI_BG_GRAY,
 	)
+	welcome_win.ctrl_buttons.close.on_click = proc() {
+		fmt.printfln("closing welcome win")
+		game_mem.state = .PLAYING
+	}
+
+	append(&windows, welcome_win)
 }
 
 ui_draw :: proc() {
 	for w in windows {
-		ui_draw_window(w.title, w.rec, UI_BG_GRAY, true)
+		ui_draw_window(w)
 	}
 
 	// Draw the tileset
@@ -151,40 +178,49 @@ ui_draw :: proc() {
 		}
 	}
 
-	// Draw the selected tile
-	if game_mem.selected_tile.type != .NONE {
-		dst := rl.Rectangle {
-			track_tiles.x + f32(game_mem.selected_tile.pos_grid.x * TILE_SIZE),
-			track_tiles.y + f32(game_mem.selected_tile.pos_grid.y * TILE_SIZE),
-			TILE_SIZE,
-			TILE_SIZE,
+	if game_mem.state == .PLAYING {
+		// Draw the selected tile
+		if game_mem.selected_tile.type != .NONE {
+			dst := rl.Rectangle {
+				track_tiles.x + f32(game_mem.selected_tile.pos_grid.x * TILE_SIZE),
+				track_tiles.y + f32(game_mem.selected_tile.pos_grid.y * TILE_SIZE),
+				TILE_SIZE,
+				TILE_SIZE,
+			}
+			rl.DrawRectangleLinesEx(dst, 1, rl.RED)
 		}
-		rl.DrawRectangleLinesEx(dst, 1, rl.RED)
-	}
 
-	// draw_horizontal_rule(
-	// 	{track_tiles.x, track_tiles.y + track_tiles.height + 10},
-	// 	f32(track_tiles.width - 0),
-	// )
-
-	for b in buttons {
-		draw_button(b)
+		ui_draw_countdown_timer()
 	}
 }
 
 ui_update :: proc() -> bool {
 	for &w in windows {
 		if !rl.CheckCollisionPointRec(input.mouse.pos_px, w.rec) {
-			return false
+			continue
 		}
+
+		fmt.printfln("%s", w.title)
 
 		if .LEFT in input.mouse.btns {
 			// w.dragging = true
 
 			// Handle window button presses
-			if rl.CheckCollisionPointRec(input.mouse.pos_px, w.buttons.close.pos_px) {
-				fmt.printfln("close pressed")
-				// append(&windows, ui_new_window("test", {200, 200, 200, 200}))
+			for b in w.buttons {
+				if rl.CheckCollisionPointRec(input.mouse.pos_px, b.pos_px) {
+					fmt.printfln("button clicked")
+					if b.on_click != nil {
+						b.on_click()
+					}
+				}
+			}
+
+			// Check for clicks on close button
+			if rl.CheckCollisionPointRec(input.mouse.pos_px, w.ctrl_buttons.close.pos_px) {
+				fmt.printfln("ctrl button clicked")
+				if w.ctrl_buttons.close.on_click != nil {
+					w.ctrl_buttons.close.on_click()
+				}
 			}
 
 			// Handle track_tiles button presses
@@ -218,24 +254,27 @@ ui_update :: proc() -> bool {
 				w.rec.y = w.drag_start_rec.y + input.mouse.pos_px.y
 			}
 		}
-
-		for b in buttons {
-			if rl.CheckCollisionPointRec(input.mouse.pos_px, b.pos_px) {
-				if .LEFT in input.mouse.btns {
-					game_mem.state = .SIMULATING
-				}
-			}
-		}
 	}
 
 	return true
 }
 
-ui_new_window :: proc(title: string, rec: rl.Rectangle) -> Window {
+ui_new_window :: proc(
+	title: string,
+	rec: rl.Rectangle,
+	text: string,
+	buttons: []Button,
+	padding: f32,
+	bg_colour: rl.Color,
+) -> Window {
 	return Window {
 		title = title,
 		rec = rec,
-		buttons = {
+		bg_colour = bg_colour,
+		buttons = buttons,
+		text = text,
+		padding = padding,
+		ctrl_buttons = {
 			close = {
 				pos_px = {
 					rec.x + rec.width - UI_BUTTON_TILE_SIZE - 10,
@@ -248,22 +287,30 @@ ui_new_window :: proc(title: string, rec: rl.Rectangle) -> Window {
 	}
 }
 
-ui_draw_window :: proc(
-	title: string,
-	win_rec: rl.Rectangle,
-	bg_colour: rl.Color,
-	has_shadow := false,
-) {
-	if has_shadow {
+ui_draw_window :: proc(win: Window) {
+	if win.has_shadow {
 		shadow_size: f32 = 4
 		rl.DrawRectangleRec(
-			{win_rec.x + shadow_size, win_rec.y + shadow_size, win_rec.width, win_rec.height},
+			{win.rec.x + shadow_size, win.rec.y + shadow_size, win.rec.width, win.rec.height},
 			rl.BLACK - {0, 0, 0, 80},
 		)
 	}
-	ui_window_top(win_rec.x, win_rec.y, win_rec.width, title)
-	ui_window_middle(win_rec.x, win_rec.y, win_rec.width, win_rec.height, bg_colour)
-	ui_window_bottom(win_rec.x, win_rec.y, win_rec.width, win_rec.height)
+	ui_window_top(win.rec.x, win.rec.y, win.rec.width, win.title)
+	ui_window_middle(win.rec.x, win.rec.y, win.rec.width, win.rec.height, win.bg_colour)
+	ui_window_bottom(win.rec.x, win.rec.y, win.rec.width, win.rec.height)
+
+	rl.DrawTextEx(
+		font,
+		fmt.ctprint(win.text),
+		win.rec.x + win.padding,
+		win.rec.y + UI_TILE_SIZE + win.padding,
+		1,
+		rl.BLACK,
+	)
+
+	for b in buttons {
+		ui_draw_button(b)
+	}
 }
 
 ui_window_top :: proc(x, y, width: f32, title: string) {
@@ -313,6 +360,13 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 		{0, 0},
 		0,
 		rl.WHITE,
+	)
+
+	// Debug
+	rl.DrawRectangleLinesEx(
+		{x + width - UI_BUTTON_TILE_SIZE - 10, y + 10, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
+		1,
+		rl.RED,
 	)
 }
 
@@ -416,15 +470,21 @@ ui_window_bottom :: proc(x, y, width, height: f32) {
 	)
 }
 
-new_button :: proc(x, y: f32, label: string) -> Button {
+ui_new_button :: proc(x, y: f32, win: rl.Rectangle, label: string, on_click: proc()) -> Button {
 	w := rl.MeasureText(fmt.ctprintf("%s", label), UI_FONT_SIZE)
 	return Button {
-		pos_px = {x, y, f32(w) + UI_BUTTON_PADDING, UI_FONT_SIZE + UI_BUTTON_PADDING * 2},
+		pos_px = {
+			win.x + UI_BUTTON_PADDING + x,
+			win.y + y,
+			f32(w) + UI_BUTTON_PADDING,
+			UI_FONT_SIZE + UI_BUTTON_PADDING * 2,
+		},
 		label = label,
+		on_click = on_click,
 	}
 }
 
-draw_button :: proc(b: Button) {
+ui_draw_button :: proc(b: Button) {
 	pos := rl.Vector2{b.pos_px.x, b.pos_px.y}
 	lbl_pos := pos
 	size := rl.Vector2{b.pos_px.width, b.pos_px.height}
@@ -441,9 +501,27 @@ draw_button :: proc(b: Button) {
 		1,
 		rl.BLACK,
 	)
+
+	// Debug
+	rl.DrawRectangleLinesEx({pos.x, pos.y, size.x, size.y}, 1, rl.RED)
 }
 
-draw_horizontal_rule :: proc(start: rl.Vector2, length: f32) {
+ui_draw_countdown_timer :: proc() {
+	// Draw countdown
+	countdown_size: i32 = 25
+	countdown_txt := fmt.ctprintf(
+		"Imminent danger in: %d",
+		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)),
+	)
+	txt_w := rl.MeasureText(countdown_txt, countdown_size)
+	txt_h: i32 = 50
+	txt_x := rl.GetScreenWidth() / 2 - txt_w / 2
+	txt_y := tile_y_offset + 10
+	rl.DrawRectangle(txt_x - 20, txt_y - 10, txt_w + 40, txt_h, rl.BLACK - {0, 0, 0, 100})
+	rl.DrawText(countdown_txt, txt_x, txt_y, countdown_size, rl.RED)
+}
+
+ui_draw_horizontal_rule :: proc(start: rl.Vector2, length: f32) {
 	end := start + {length, 0}
 	rl.DrawLineV(start, end, rl.LIGHTGRAY)
 	rl.DrawLineV(start + {1, 0}, end + {1, 0}, rl.GRAY)
