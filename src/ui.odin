@@ -22,6 +22,7 @@ UI_BG_GRAY :: rl.Color{192, 199, 200, 255}
 UI_FONT_SIZE :: 20
 
 Window :: struct {
+	id:             string,
 	title:          string,
 	rec:            rl.Rectangle,
 	drag_start_rec: rl.Rectangle,
@@ -33,7 +34,7 @@ Window :: struct {
 		minimise: Button,
 	},
 	buttons:        []Button,
-	text:           string,
+	text:           cstring,
 	bg_colour:      rl.Color,
 	padding:        f32,
 	has_shadow:     bool,
@@ -56,6 +57,7 @@ buttons: [dynamic]Button
 track_tiles: rl.Rectangle
 font: rl.Font
 tile_nums: map[u16]i32
+window_remove_queue: [dynamic]string
 
 ui_setup :: proc() {
 	ui_tileset = rl.LoadTexture("res/ui.png")
@@ -72,7 +74,18 @@ ui_setup :: proc() {
 		width  = tt_win_width,
 	}
 	tt_btns := []Button{ui_new_button(0, track_tiles.height + 10, tt_win_rec, "Simulate", nil)}
-	track_tiles_win := ui_new_window("Track pieces", tt_win_rec, "", tt_btns, 0, UI_BG_GRAY)
+	track_tiles_win := ui_new_window(
+		"trackpieces",
+		"Track pieces",
+		tt_win_rec,
+		"",
+		tt_btns,
+		0,
+		UI_BG_GRAY,
+	)
+	track_tiles_win.ctrl_buttons.close.on_click = proc() {
+		fmt.printfln("You haven't completed the simulation!")
+	}
 
 	append(&windows, track_tiles_win)
 
@@ -92,14 +105,18 @@ ui_setup :: proc() {
 	// Create welcome window
 	w_win_width: f32 = 500
 	w_win_rec := rl.Rectangle {
-		x      = f32(rl.GetScreenWidth()) - w_win_width - WIN_PADDING * 2,
+		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
 		y      = f32(300 + WIN_PADDING * 1.5),
 		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = w_win_width,
 	}
 	w_btns := []Button{}
-	w_txt := "Welcome to Track Master 2000"
+	w_txt := fmt.ctprintf(
+		"Welcome\n\nTrack Master 2000 is highly advanced train TRAVEL\nsimulation software used by thousands of municipalities\nacross the world to ensure the safe travel of millions.\n\nYour task is to use the tracks provided to map out a\nroute for the train to reach the town. You have %d\nminutes to complete the task after which the simulation\nwill begin. Alternatively, click the SIMULATE button\nto run the simulation early.\n\nGood luck",
+		LEVEL_TIME_LIMIT / 60,
+	)
 	welcome_win := ui_new_window(
+		"welcomewin",
 		"Welcome",
 		w_win_rec,
 		w_txt,
@@ -108,8 +125,8 @@ ui_setup :: proc() {
 		UI_BG_GRAY,
 	)
 	welcome_win.ctrl_buttons.close.on_click = proc() {
-		fmt.printfln("closing welcome win")
-		game_mem.state = .PLAYING
+		append(&window_remove_queue, "welcomewin")
+		game_push_state(.PLAYING)
 	}
 
 	append(&windows, welcome_win)
@@ -178,7 +195,7 @@ ui_draw :: proc() {
 		}
 	}
 
-	if game_mem.state == .PLAYING {
+	if game_get_state() == .PLAYING {
 		// Draw the selected tile
 		if game_mem.selected_tile.type != .NONE {
 			dst := rl.Rectangle {
@@ -197,6 +214,10 @@ ui_draw :: proc() {
 ui_update :: proc() -> bool {
 	handled: bool
 
+	if len(windows) > 0 {
+		ui_remove_windows()
+	}
+
 	for &w in windows {
 		if !rl.CheckCollisionPointRec(input.mouse.pos_px, w.rec) {
 			continue
@@ -208,7 +229,6 @@ ui_update :: proc() -> bool {
 			// Handle window button presses
 			for b in w.buttons {
 				if rl.CheckCollisionPointRec(input.mouse.pos_px, b.pos_px) {
-					fmt.printfln("button clicked")
 					if b.on_click != nil {
 						b.on_click()
 					}
@@ -217,7 +237,6 @@ ui_update :: proc() -> bool {
 
 			// Check for clicks on close button
 			if rl.CheckCollisionPointRec(input.mouse.pos_px, w.ctrl_buttons.close.pos_px) {
-				fmt.printfln("ctrl button clicked")
 				if w.ctrl_buttons.close.on_click != nil {
 					w.ctrl_buttons.close.on_click()
 				}
@@ -262,14 +281,16 @@ ui_update :: proc() -> bool {
 }
 
 ui_new_window :: proc(
+	id: string,
 	title: string,
 	rec: rl.Rectangle,
-	text: string,
+	text: cstring,
 	buttons: []Button,
 	padding: f32,
 	bg_colour: rl.Color,
 ) -> Window {
 	return Window {
+		id = id,
 		title = title,
 		rec = rec,
 		bg_colour = bg_colour,
@@ -289,6 +310,17 @@ ui_new_window :: proc(
 	}
 }
 
+ui_remove_windows :: proc() {
+	for rw in window_remove_queue {
+		for w, i in windows {
+			if w.id == rw {
+				unordered_remove(&windows, i)
+			}
+		}
+	}
+	clear_dynamic_array(&window_remove_queue)
+}
+
 ui_draw_window :: proc(win: Window) {
 	if win.has_shadow {
 		shadow_size: f32 = 4
@@ -304,8 +336,8 @@ ui_draw_window :: proc(win: Window) {
 	rl.DrawTextEx(
 		font,
 		fmt.ctprint(win.text),
-		win.rec.x + win.padding,
-		win.rec.y + UI_TILE_SIZE + win.padding,
+		{win.rec.x + win.padding + UI_BORDER_TILE_SIZE, win.rec.y + UI_TILE_SIZE + win.padding},
+		UI_FONT_SIZE,
 		1,
 		rl.BLACK,
 	)
@@ -365,11 +397,11 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 	)
 
 	// Debug
-	rl.DrawRectangleLinesEx(
-		{x + width - UI_BUTTON_TILE_SIZE - 10, y + 10, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
-		1,
-		rl.RED,
-	)
+	// rl.DrawRectangleLinesEx(
+	// 	{x + width - UI_BUTTON_TILE_SIZE - 10, y + 10, UI_BUTTON_TILE_SIZE, UI_BUTTON_TILE_SIZE},
+	// 	1,
+	// 	rl.RED,
+	// )
 }
 
 ui_window_middle :: proc(x, y, width, height: f32, bg_colour: rl.Color) {

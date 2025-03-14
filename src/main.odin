@@ -27,7 +27,7 @@ CAMERA_SHAKE_DURATION :: 15
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
-LEVEL_TIME_LIMIT :: 30 // Seconds
+LEVEL_TIME_LIMIT :: 5 // Seconds
 
 Tile :: struct {
 	pos_grid: rl.Vector2,
@@ -60,7 +60,7 @@ GameState :: enum {
 
 GameMemory :: struct {
 	selected_tile: Tile,
-	state:         GameState,
+	state:         [2]GameState,
 }
 
 game_mem: GameMemory
@@ -105,7 +105,7 @@ main :: proc() {
 	setup()
 
 	for !rl.WindowShouldClose() {
-		if game_mem.state == .EXIT {
+		if game_get_state() == .EXIT {
 			break
 		}
 		input_process(&input)
@@ -117,10 +117,11 @@ main :: proc() {
 setup :: proc() {
 	game_mem = {
 		selected_tile = {pos_px = {1, 1, 1, 1}},
-		state = .MAIN_MENU,
 	}
+	game_push_state(.MAIN_MENU)
 
 	bg_win = ui_new_window(
+		"mainwin",
 		"Track Master 2000",
 		rl.Rectangle {
 			20,
@@ -135,7 +136,7 @@ setup :: proc() {
 	)
 	bg_win.ctrl_buttons.close.on_click = proc() {
 		fmt.println("exting")
-		game_mem.state = .EXIT
+		game_push_state(.EXIT)
 	}
 
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
@@ -305,6 +306,19 @@ setup :: proc() {
 	ui_setup()
 }
 
+game_get_state :: proc() -> GameState {
+	return game_mem.state[0]
+}
+game_get_prev_state :: proc() -> GameState {
+	return game_mem.state[1]
+}
+
+game_push_state :: proc(state: GameState) {
+	temp_state := game_mem.state[0]
+	game_mem.state[0] = state
+	game_mem.state[1] = temp_state
+}
+
 update :: proc() {
 	// TODO:(lukefilewalker) everything else won't get updated if the ui consumes input :(
 	if ui_update() do return
@@ -317,12 +331,15 @@ update :: proc() {
 		}
 	}
 
-	switch game_mem.state {
+	switch game_get_state() {
 	case .MAIN_MENU:
-		// if play is pressed
-		start_timer(&level_end, LEVEL_TIME_LIMIT)
 
 	case .PLAYING:
+		if game_get_prev_state() == .MAIN_MENU {
+			start_timer(&level_end, LEVEL_TIME_LIMIT)
+			game_push_state(.PLAYING)
+		}
+
 		update_grid()
 
 		// if camera_shake_duration > 0 {
@@ -356,10 +373,54 @@ update :: proc() {
 	// 	camera.offset = {0, 0}
 	// }
 	case .WIN:
-	// Show winning screen
+		w_win_width: f32 = 500
+		w_win_rec := rl.Rectangle {
+			x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
+			y      = f32(300 + WIN_PADDING * 1.5),
+			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+			width  = w_win_width,
+		}
+		w_btns := []Button{}
+		w_txt := fmt.ctprint("You win :)")
+		w_win := ui_new_window(
+			"winwin",
+			"Win",
+			w_win_rec,
+			w_txt,
+			w_btns,
+			UI_WINDOW_PADDING,
+			UI_BG_GRAY,
+		)
+		w_win.ctrl_buttons.close.on_click = proc() {
+			game_push_state(.EXIT)
+		}
+
+		append(&windows, w_win)
 
 	case .GAME_OVER:
-	// Show game over screen
+		go_win_width: f32 = 500
+		go_win_rec := rl.Rectangle {
+			x      = f32(rl.GetScreenWidth() / 2) - go_win_width / 2 - WIN_PADDING * 2,
+			y      = f32(300 + WIN_PADDING * 1.5),
+			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+			width  = go_win_width,
+		}
+		go_btns := []Button{}
+		go_txt := fmt.ctprint("Everyone died :(")
+		go_win := ui_new_window(
+			"gameoverwin",
+			"Death to all",
+			go_win_rec,
+			go_txt,
+			go_btns,
+			UI_WINDOW_PADDING,
+			UI_BG_GRAY,
+		)
+		go_win.ctrl_buttons.close.on_click = proc() {
+			game_push_state(.EXIT)
+		}
+
+		append(&windows, go_win)
 
 	case .EXIT:
 	}
@@ -407,7 +468,7 @@ render :: proc() {
 		}
 	}
 
-	// draw_debug_ui()
+	draw_debug_ui()
 
 	ui_draw()
 
@@ -464,11 +525,11 @@ check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 		if proposed_path[i].pos_grid != path[i].pos_grid ||
 		   proposed_path[i].src_px != path[i].src_px ||
 		   proposed_path[i].type != path[i].type {
-			game_mem.state = .GAME_OVER
+			game_push_state(.GAME_OVER)
 			camera_shake_duration = CAMERA_SHAKE_DURATION
 		}
 	}
-	game_mem.state = .WIN
+	game_push_state(.GAME_OVER)
 }
 
 lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
@@ -511,7 +572,7 @@ gen_hash :: proc(x, y: i32) -> u16 {
 }
 
 draw_debug_ui :: proc() {
-	rl.DrawText(fmt.ctprintf("%v", get_elapsed(level_end)), 10, 10, 20, rl.BLACK)
+	rl.DrawText(fmt.ctprintf("%s", game_mem.state), 10, 10, 20, rl.BLACK)
 
 	i := 0
 	for t in path {
