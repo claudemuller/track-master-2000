@@ -484,22 +484,27 @@ Memory Test: %d KB`
 
 	rl.DrawText(
 		fmt.ctprintf(top_txt, date_str, i32(memctr)),
-		WIN_PADDING,
-		WIN_PADDING,
+		WIN_PADDING * 2,
+		WIN_PADDING * 2,
 		font_size,
 		txt_colour,
 	)
 
 	bottom_txt := "Press DEL to enter SETUP\n%s-SYS-2401-A/C/2B"
 	rl.DrawText(
-		fmt.ctprintf(top_txt, date_str),
-		WIN_PADDING,
-		rl.GetScreenHeight() - WIN_PADDING - font_size * 2,
+		fmt.ctprintf(bottom_txt, date_str),
+		WIN_PADDING * 2,
+		rl.GetScreenHeight() - WIN_PADDING * 2 - font_size * 2,
 		font_size,
 		txt_colour,
 	)
 
-	rl.DrawTexture(dxtrs, rl.GetScreenWidth() - dxtrs.width - WIN_PADDING, WIN_PADDING, rl.WHITE)
+	rl.DrawTexture(
+		dxtrs,
+		rl.GetScreenWidth() - dxtrs.width - WIN_PADDING * 2,
+		WIN_PADDING * 2,
+		rl.WHITE,
+	)
 }
 
 update_grid :: proc() {
