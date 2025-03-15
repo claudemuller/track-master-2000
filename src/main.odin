@@ -28,7 +28,7 @@ NUM_GRASS_TILES :: 4
 LEVEL_START_LEN :: 4
 
 TRAIN_ANIMATION_STEP :: 0.5
-LEVEL_TIME_LIMIT :: 5 // Seconds
+LEVEL_TIME_LIMIT :: 30 // Seconds
 BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
@@ -385,7 +385,6 @@ update :: proc() {
 		}
 
 		if .DEL in input.kb.btns {
-			fmt.printfln("del pressed")
 			rl.StopSound(booting_sound)
 			boot_timer = Timer{}
 			game_push_state(.MAIN_MENU)
@@ -443,8 +442,10 @@ update :: proc() {
 
 			tile := proposed_path[proposed_node_idx]
 			train.pos_grid = tile.pos_grid
-			train.pos_px.x = path_nodes[proposed_node_idx].pos_px.x
-			train.pos_px.y = path_nodes[proposed_node_idx].pos_px.y
+			if proposed_node_idx > 0 && proposed_node_idx < len(path_nodes) {
+				train.pos_px.x = path_nodes[proposed_node_idx].pos_px.x
+				train.pos_px.y = path_nodes[proposed_node_idx].pos_px.y
+			}
 			train.pos_px.width = TILE_SIZE
 			train.pos_px.height = TILE_SIZE
 			train.src_px.width = SRC_TILE_SIZE

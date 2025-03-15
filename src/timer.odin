@@ -17,5 +17,6 @@ timer_done :: proc(timer: Timer) -> bool {
 }
 
 get_elapsed :: proc(timer: Timer) -> f64 {
-	return rl.GetTime() - timer.start_time
+	elapsed := rl.GetTime() - timer.start_time
+	return elapsed < 0 ? 0 : elapsed
 }
