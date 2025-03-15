@@ -25,14 +25,25 @@ TILE_FOCUS_BORDER_WIDTH :: 2
 TILE_FOCUS_BORDER_COLOUR :: rl.RED
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
+LEVEL_START_LEN :: 4
 
 LEVEL_TIME_LIMIT :: 30 // Seconds
 BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
-	selected_tile: Tile,
-	hover_tile:    Tile,
-	state:         [2]GameState,
+	selected_tile:    Tile,
+	hover_tile:       Tile,
+	path_len:         i32,
+	level_time_limit: f64,
+	state:            [2]GameState,
+}
+
+Train :: struct {
+	pos_grid:  rl.Vector2,
+	pos_px:    rl.Rectangle,
+	src_px:    rl.Rectangle,
+	direction: Direction,
+	texture:   rl.Texture2D,
 }
 
 game_mem: GameMemory
@@ -43,12 +54,14 @@ booting: Timer
 booting_sound: rl.Sound
 memctr: f64
 bg_win: Window
+train: Train
 
 grid: Grid
-path_len: i32 = 50
 path: [][2]i32
 path_nodes: [dynamic]Tile
 proposed_path: [dynamic]Tile
+proposed_node_idx: int
+correct_nodes: int
 
 tileset: rl.Texture2D
 grass_tileset: rl.Texture2D
@@ -101,6 +114,7 @@ setup :: proc() {
 	station = rl.LoadTexture("res/station.png")
 	town = rl.LoadTexture("res/town.png")
 	dxtrs = rl.LoadTexture("res/dxtrs-games-vin.png")
+	train.texture = rl.LoadTexture("res/train.png")
 
 	bg_win = ui_new_window(
 		"mainwin",
@@ -120,7 +134,7 @@ setup :: proc() {
 		game_push_state(.EXIT)
 	}
 
-	reset_game()
+	reset_game(true)
 
 	ui_setup()
 
@@ -142,12 +156,12 @@ travel of millions.
 
 Your task is to use the tracks provided to map out
 a route for the train to reach the town. You have
-%d minutes to complete the task after which the
+%.1f minutes to complete the task after which the
 simulation will begin. Alternatively, click
 the SIMULATE button to run the simulation early.
 
 Good luck`,
-		LEVEL_TIME_LIMIT / 60,
+		game_mem.level_time_limit / 60,
 	)
 	welcome_win := ui_new_window(
 		"welcomewin",
@@ -168,10 +182,24 @@ Good luck`,
 	boot_game()
 }
 
-reset_game :: proc() {
-	game_mem = {
-		selected_tile = {pos_px = {1, 1, 1, 1}},
+reset_game :: proc(level1: bool) {
+	clear_dynamic_array(&path_nodes)
+	clear_dynamic_array(&proposed_path)
+	path = [][2]i32{}
+
+	game_mem.selected_tile = {
+		pos_px = {1, 1, 1, 1},
 	}
+
+	if level1 {
+		game_mem.path_len = LEVEL_START_LEN
+		game_mem.level_time_limit = LEVEL_TIME_LIMIT
+	} else {
+		factor := (game_mem.path_len + LEVEL_START_LEN) / LEVEL_START_LEN
+		game_mem.path_len = game_mem.path_len + LEVEL_START_LEN
+		game_mem.level_time_limit = f64(factor) * LEVEL_TIME_LIMIT
+	}
+	level_end = Timer{}
 
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
 	grid = {
@@ -183,8 +211,10 @@ reset_game :: proc() {
 		},
 		tiles = make(map[u16]Tile, tot_num_tiles),
 	}
+	proposed_node_idx = 0
+	correct_nodes = 0
 
-	clear_map(&grid.tiles)
+	// clear_map(&grid.tiles)
 
 	// Create the grid of tiles
 	for y in 0 ..< i32(NUM_TILES_IN_COL) {
@@ -279,7 +309,7 @@ reset_game :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path = gen_path({0, 1}, path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
+	path = gen_path({0, 1}, game_mem.path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
 	hash: u16
@@ -370,7 +400,7 @@ update :: proc() {
 
 	case .PLAYING:
 		if game_get_prev_state() == .MAIN_MENU {
-			start_timer(&level_end, LEVEL_TIME_LIMIT)
+			start_timer(&level_end, game_mem.level_time_limit)
 			// Push PLAYING to drop MAIN_MENU for next frame
 			game_push_state(.PLAYING)
 		}
@@ -383,13 +413,38 @@ update :: proc() {
 		}
 
 	case .SIMULATING:
-		check_path(path_nodes, proposed_path)
+		if len(proposed_path) <= 0 {
+			game_push_state(.GAME_OVER)
+			return
+		}
+
+		if proposed_node_idx < len(proposed_path) {
+			correct_nodes += check_path(path_nodes, proposed_path[proposed_node_idx])
+
+			train.pos_grid = proposed_path[proposed_node_idx].pos_grid
+			train.pos_px = proposed_path[proposed_node_idx].pos_px
+			train.src_px = {0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
+			train.direction = .DOWN
+
+			proposed_node_idx += 1
+		} else {
+			if correct_nodes == len(path) - 1 {
+				game_push_state(.WIN)
+			} else {
+				game_push_state(.GAME_OVER)
+			}
+		}
 
 	case .WIN:
-		create_win_lose_window("Congratulations!", "winwin", "You win :)")
+		create_win_lose_window(
+			"Congratulations!",
+			"winwin",
+			"All the passengers made it - let's extend the track.",
+			true,
+		)
 
 	case .GAME_OVER:
-		create_win_lose_window("You're Fired", "losewin", "Everyone died :(")
+		create_win_lose_window("You're Fired", "losewin", "Everyone died :(", false)
 
 	case .EXIT:
 		create_confirmation_window("Goodbye", "exitwin", "Are you sure you want to quit?")
@@ -454,6 +509,10 @@ render :: proc() {
 				case .NONE:
 				}
 			}
+		}
+
+		if game_get_state() == .SIMULATING || game_get_state() == .PLAYING {
+			rl.DrawTexturePro(train.texture, train.src_px, train.pos_px, {0, 0}, 0, rl.WHITE)
 		}
 
 		// Draw mouse hover tile

@@ -69,7 +69,8 @@ ui_setup :: proc() {
 ui_reset :: proc() {
 	ui_remove_windows()
 	clear_dynamic_array(&windows)
-	clear_map(&tile_nums)
+	// clear_map(&tile_nums)
+	tile_nums = make(map[u16]i32)
 	track_tiles = rl.Rectangle{}
 
 	// Create track tiles window
@@ -158,6 +159,7 @@ ui_draw :: proc() {
 
 	// Draw tile number indicator
 	if game_get_state() == .PLAYING {
+		// fmt.printfln("num_tiles:%v", len(tile_nums))
 		// TODO:(lukefilewalker) fix this mess :/
 		for k, v in tile_nums {
 			for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
@@ -371,40 +373,55 @@ create_confirmation_window :: proc(title, id, content: string) {
 			UI_TILE_SIZE + UI_FONT_SIZE * 2,
 			w_win_rec,
 			"Cancel",
-			proc() {reset_game()},
+			proc() {reset_game(true)},
 		),
 	)
 
 	w_win := ui_new_window(id, title, w_win_rec, w_txt, w_btns, UI_WINDOW_PADDING, UI_BG_GRAY)
 	w_win.ctrl_buttons.close.on_click = proc() {
-		reset_game()
+		reset_game(true)
 	}
 
 	append(&windows, w_win)
 }
 
 // TODO:(claude) tihs is the same as teh confirmation win :(
-create_win_lose_window :: proc(title, id, content: string) {
-	w_win_width: f32 = 210
+create_win_lose_window :: proc(title, id, content: string, win: bool) {
+	w_txt := fmt.ctprint(content)
+	w_win_width := f32(rl.MeasureText(w_txt, UI_FONT_SIZE)) + 20
 	w_win_rec := rl.Rectangle {
 		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
 		y      = f32(400 + WIN_PADDING * 1.5),
 		height = 40 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = w_win_width,
 	}
-	w_txt := fmt.ctprint(content)
 
 	w_btns: [dynamic]Button
-	append(
-		&w_btns,
-		ui_new_button(
-			SRC_UI_BORDER_TILE_SIZE,
-			UI_TILE_SIZE + UI_FONT_SIZE * 2,
-			w_win_rec,
-			"Play Again",
-			proc() {reset_game()},
-		),
-	)
+
+	if win {
+		append(
+			&w_btns,
+			ui_new_button(
+				SRC_UI_BORDER_TILE_SIZE,
+				UI_TILE_SIZE + UI_FONT_SIZE * 2,
+				w_win_rec,
+				"Continue",
+				proc() {reset_game(false)},
+			),
+		)
+	} else {
+		append(
+			&w_btns,
+			ui_new_button(
+				SRC_UI_BORDER_TILE_SIZE,
+				UI_TILE_SIZE + UI_FONT_SIZE * 2,
+				w_win_rec,
+				"Restart",
+				proc() {reset_game(true)},
+			),
+		)
+	}
+
 	append(
 		&w_btns,
 		ui_new_button(
@@ -473,7 +490,6 @@ ui_window_top :: proc(x, y, width: f32, title: string) {
 		rl.WHITE,
 	)
 }
-
 ui_window_middle :: proc(x, y, width, height: f32, bg_colour: rl.Color) {
 	// Background
 	rl.DrawRectangleRec(
