@@ -328,13 +328,8 @@ reset_game :: proc(level1: bool) {
 			next := path[i + 1]
 			off_tile_dir := next - this_tile
 			if off_tile_dir == {0, 1} {
-				fmt.printfln("prev:%v next:%v {0, 1}", prev, next)
 				src_px = ts[Direction.DOWN][Direction.DOWN]
-				// } else if off_tile_dir == {1, 1} {
-				// 	fmt.println("%v %v {0, 1}", prev, next)
-				// 	src_px = ts[Direction.RIGHT][Direction.RIGHT]
 			} else if off_tile_dir == {1, 0} {
-				fmt.printfln("prev:%v next:%v {1, 0}", prev, next)
 				src_px = ts[Direction.DOWN][Direction.RIGHT]
 			}
 		}
@@ -460,8 +455,6 @@ update :: proc() {
 				train.src_px.x = 3 * SRC_TILE_SIZE
 			}
 
-			fmt.printfln("%v\n%v\n", tile, path[proposed_node_idx])
-
 			proposed_node_idx += 1
 
 			start_timer(&train_timer, TRAIN_ANIMATION_STEP)
@@ -585,12 +578,12 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	// memctr = rl.GetTime()
-	// rl.PlaySound(booting_sound)
-	// start_timer(&boot_timer, BOOT_TIME)
-	// game_push_state(.BOOTING)
+	memctr = rl.GetTime()
+	rl.PlaySound(booting_sound)
+	start_timer(&boot_timer, BOOT_TIME)
+	game_push_state(.BOOTING)
 	// DEBUG
-	game_push_state(.MAIN_MENU)
+	// game_push_state(.MAIN_MENU)
 	// .DEBUG
 }
 

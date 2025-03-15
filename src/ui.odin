@@ -159,7 +159,6 @@ ui_draw :: proc() {
 
 	// Draw tile number indicator
 	if game_get_state() == .PLAYING {
-		// fmt.printfln("num_tiles:%v", len(tile_nums))
 		// TODO:(lukefilewalker) fix this mess :/
 		for k, v in tile_nums {
 			for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
@@ -268,7 +267,6 @@ ui_update :: proc() -> bool {
 			w.drag_start_rec = w.rec
 			titlebar := rl.Rectangle{w.rec.x, w.rec.y, w.rec.width, UI_TILE_SIZE}
 			if rl.CheckCollisionPointRec(input.mouse.pos_px, titlebar) {
-				fmt.printfln("in titlebar")
 				w.rec.x = w.drag_start_rec.x + input.mouse.pos_px.x
 				w.rec.y = w.drag_start_rec.y + input.mouse.pos_px.y
 			}
