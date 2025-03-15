@@ -45,6 +45,7 @@ memctr: f64
 bg_win: Window
 
 grid: Grid
+path_len: i32 = 50
 path: [][2]i32
 path_nodes: [dynamic]Tile
 proposed_path: [dynamic]Tile
@@ -279,7 +280,6 @@ reset_game :: proc() {
 		SRC_TILE_SIZE,
 	}
 
-	path_len: i32 = 4
 	path = gen_path({0, 1}, path_len, NUM_TILES_IN_ROW, NUM_TILES_IN_COL)
 	src_px := rl.Rectangle{0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
 
@@ -473,11 +473,13 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	// memctr = rl.GetTime()
-	// rl.PlaySound(booting_sound)
-	// start_timer(&booting, BOOT_TIME)
+	memctr = rl.GetTime()
+	rl.PlaySound(booting_sound)
+	start_timer(&booting, BOOT_TIME)
 	// game_push_state(.BOOTING)
+	// DEBUG
 	game_push_state(.MAIN_MENU)
+	// .DEBUG
 }
 
 draw_boot_screen :: proc() {
