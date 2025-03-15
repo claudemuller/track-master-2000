@@ -18,6 +18,8 @@ bin-dir:
 	@mkdir -p ${BIN_DIR}
 
 release-dir:
+	rm -rf ./build
+	mkdir -p build
 	rm -rf ./release
 	mkdir -p release
 
