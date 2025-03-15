@@ -20,9 +20,9 @@ WINDOW_HEIGHT ::
 	(UI_TILE_SIZE + UI_BOTTOM_BORDER_TILE_SIZE) +
 	(WIN_PADDING * 2)
 WIN_PADDING :: 20
-CAMERA_SHAKE_MAGNITUDE :: 5.0
-CAMERA_SHAKE_DURATION :: 15
 
+TILE_FOCUS_BORDER_WIDTH :: 2
+TILE_FOCUS_BORDER_COLOUR :: rl.RED
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 
@@ -31,6 +31,7 @@ BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
 	selected_tile: Tile,
+	hover_tile:    Tile,
 	state:         [2]GameState,
 }
 
@@ -80,7 +81,7 @@ main :: proc() {
 	setup()
 
 	for !rl.WindowShouldClose() {
-		if game_get_state() == .EXIT {
+		if game_get_state() == .SHUTDOWN {
 			break
 		}
 		input_process(&input)
@@ -94,9 +95,11 @@ setup :: proc() {
 
 	booting_sound = rl.LoadSound("res/pc-boot.mp3")
 
-	game_mem = {
-		selected_tile = {pos_px = {1, 1, 1, 1}},
-	}
+	tileset = rl.LoadTexture("res/tileset.png")
+	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
+	station = rl.LoadTexture("res/station.png")
+	town = rl.LoadTexture("res/town.png")
+	dxtrs = rl.LoadTexture("res/dxtrs-games-vin.png")
 
 	bg_win = ui_new_window(
 		"mainwin",
@@ -117,6 +120,59 @@ setup :: proc() {
 		game_push_state(.EXIT)
 	}
 
+	reset_game()
+
+	ui_setup()
+
+	// Create welcome window
+	w_win_width: f32 = 500
+	w_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
+		y      = f32(300 + WIN_PADDING * 1.5),
+		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		width  = w_win_width,
+	}
+	w_txt := fmt.ctprintf(
+		`Welcome
+
+Track Master 2000 is highly advanced train TRAVEL
+simulation software used by thousands of
+municipalities across the world to ensure the safe
+travel of millions.
+
+Your task is to use the tracks provided to map out
+a route for the train to reach the town. You have
+%d minutes to complete the task after which the
+simulation will begin. Alternatively, click
+the SIMULATE button to run the simulation early.
+
+Good luck`,
+		LEVEL_TIME_LIMIT / 60,
+	)
+	welcome_win := ui_new_window(
+		"welcomewin",
+		"Welcome",
+		w_win_rec,
+		w_txt,
+		[dynamic]Button{},
+		UI_WINDOW_PADDING,
+		UI_BG_GRAY,
+	)
+	welcome_win.ctrl_buttons.close.on_click = proc() {
+		append(&window_remove_queue, "welcomewin")
+		game_push_state(.PLAYING)
+	}
+
+	append(&windows, welcome_win)
+
+	boot_game()
+}
+
+reset_game :: proc() {
+	game_mem = {
+		selected_tile = {pos_px = {1, 1, 1, 1}},
+	}
+
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
 	grid = {
 		pos_px = {
@@ -127,6 +183,8 @@ setup :: proc() {
 		},
 		tiles = make(map[u16]Tile, tot_num_tiles),
 	}
+
+	clear_map(&grid.tiles)
 
 	// Create the grid of tiles
 	for y in 0 ..< i32(NUM_TILES_IN_COL) {
@@ -274,63 +332,17 @@ setup :: proc() {
 			src_px   = src_px,
 			type     = .TRACK,
 		}
-		// grid.tiles[hash] = t
+		grid.tiles[hash] = t
 		append(&path_nodes, t)
 	}
 
 	town_tile := &grid.tiles[hash]
 	town_tile.type = .TOWN
 
-	tileset = rl.LoadTexture("res/tileset.png")
-	grass_tileset = rl.LoadTexture("res/grass-tileset.png")
-	station = rl.LoadTexture("res/station.png")
-	town = rl.LoadTexture("res/town.png")
-	dxtrs = rl.LoadTexture("res/dxtrs-games-vin.png")
+	ui_reset()
 
-	ui_setup()
-
-	// Create welcome window
-	w_win_width: f32 = 500
-	w_win_rec := rl.Rectangle {
-		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
-		y      = f32(300 + WIN_PADDING * 1.5),
-		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
-		width  = w_win_width,
-	}
-	w_txt := fmt.ctprintf(
-		`Welcome
-
-Track Master 2000 is highly advanced train TRAVEL
-simulation software used by thousands of
-municipalities across the world to ensure the safe
-travel of millions.
-
-Your task is to use the tracks provided to map out
-a route for the train to reach the town. You have
-%d minutes to complete the task after which the
-simulation will begin. Alternatively, click
-the SIMULATE button to run the simulation early.
-
-Good luck`,
-		LEVEL_TIME_LIMIT / 60,
-	)
-	welcome_win := ui_new_window(
-		"welcomewin",
-		"Welcome",
-		w_win_rec,
-		w_txt,
-		[dynamic]Button{},
-		UI_WINDOW_PADDING,
-		UI_BG_GRAY,
-	)
-	welcome_win.ctrl_buttons.close.on_click = proc() {
-		append(&window_remove_queue, "welcomewin")
-		game_push_state(.PLAYING)
-	}
-
-	append(&windows, welcome_win)
-
-	boot_game()
+	game_push_state(.BOOTING)
+	game_push_state(.MAIN_MENU)
 }
 
 update :: proc() {
@@ -366,18 +378,6 @@ update :: proc() {
 
 		update_grid()
 
-		// if camera_shake_duration > 0 {
-		// 	camera.offset.x = f32(
-		// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-		// 	)
-		// 	camera.offset.y = f32(
-		// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-		// 	)
-		// 	camera_shake_duration -= 1
-		// } else {
-		// 	camera.offset = {0, 0}
-		// }
-
 		// Level time is up, check path
 		if timer_done(level_end) {
 			game_push_state(.SIMULATING)
@@ -386,68 +386,16 @@ update :: proc() {
 	case .SIMULATING:
 		check_path(path_nodes, proposed_path)
 
-	// if camera_shake_duration > 0 {
-	// 	camera.offset.x = f32(
-	// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-	// 	)
-	// 	camera.offset.y = f32(
-	// 		rl.GetRandomValue(-CAMERA_SHAKE_MAGNITUDE, CAMERA_SHAKE_MAGNITUDE),
-	// 	)
-	// 	camera_shake_duration -= 1
-	// } else {
-	// 	camera.offset = {0, 0}
-	// }
-
 	case .WIN:
-		w_win_width: f32 = 500
-		w_win_rec := rl.Rectangle {
-			x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
-			y      = f32(300 + WIN_PADDING * 1.5),
-			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
-			width  = w_win_width,
-		}
-		w_btns := [1]Button{}
-		w_txt := fmt.ctprint("You win :)")
-		w_win := ui_new_window(
-			"winwin",
-			"Win",
-			w_win_rec,
-			w_txt,
-			[dynamic]Button{},
-			UI_WINDOW_PADDING,
-			UI_BG_GRAY,
-		)
-		w_win.ctrl_buttons.close.on_click = proc() {
-			game_push_state(.EXIT)
-		}
-
-		append(&windows, w_win)
+		create_win_lose_window("Congratulations!", "winwin", "You win :)")
 
 	case .GAME_OVER:
-		go_win_width: f32 = 500
-		go_win_rec := rl.Rectangle {
-			x      = f32(rl.GetScreenWidth() / 2) - go_win_width / 2 - WIN_PADDING * 2,
-			y      = f32(300 + WIN_PADDING * 1.5),
-			height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
-			width  = go_win_width,
-		}
-		go_txt := fmt.ctprint("Everyone died :(")
-		go_win := ui_new_window(
-			"gameoverwin",
-			"Death to all",
-			go_win_rec,
-			go_txt,
-			[dynamic]Button{},
-			UI_WINDOW_PADDING,
-			UI_BG_GRAY,
-		)
-		go_win.ctrl_buttons.close.on_click = proc() {
-			game_push_state(.EXIT)
-		}
-
-		append(&windows, go_win)
+		create_win_lose_window("You're Fired", "losewin", "Everyone died :(")
 
 	case .EXIT:
+		create_confirmation_window("Goodbye", "exitwin", "Are you sure you want to quit?")
+
+	case .SHUTDOWN:
 	}
 }
 
@@ -508,6 +456,13 @@ render :: proc() {
 				}
 			}
 		}
+
+		// Draw mouse hover tile
+		rl.DrawRectangleLinesEx(
+			game_mem.hover_tile.pos_px,
+			TILE_FOCUS_BORDER_WIDTH,
+			TILE_FOCUS_BORDER_COLOUR,
+		)
 
 		// draw_debug_ui()
 
@@ -575,12 +530,13 @@ update_grid :: proc() {
 		return
 	}
 
+	x, y := get_mouse_grid_pos()
+	hash := gen_hash(x, y)
+	t := &grid.tiles[hash]
+	game_mem.hover_tile = t^
+
 	if .LEFT in input.mouse.btns {
 		if game_mem.selected_tile.type != .NONE {
-			x, y := get_mouse_grid_pos()
-			hash := gen_hash(x, y)
-
-			t := &grid.tiles[hash]
 			t.src_px.x = game_mem.selected_tile.src_px.x
 			t.src_px.y = game_mem.selected_tile.src_px.y
 			t.pos_px.x = f32(x * TILE_SIZE + tile_x_offset)
@@ -607,10 +563,6 @@ update_grid :: proc() {
 
 	if .RIGHT in input.mouse.btns {
 		if game_mem.selected_tile.type != .NONE {
-			x, y := get_mouse_grid_pos()
-			hash := gen_hash(x, y)
-
-			t := &grid.tiles[hash]
 			t.type = .GRASS
 
 			// Put tile back into available tiles

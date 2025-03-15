@@ -63,6 +63,15 @@ ui_setup :: proc() {
 	ui_tileset = rl.LoadTexture("res/ui.png")
 	font = rl.LoadFont("res/VT323-Regular.ttf")
 
+	ui_reset()
+}
+
+ui_reset :: proc() {
+	ui_remove_windows()
+	clear_dynamic_array(&windows)
+	clear_map(&tile_nums)
+	track_tiles = rl.Rectangle{}
+
 	// Create track tiles window
 	tt_win_width := f32(tileset.width * SCALE) + UI_BORDER_TILE_SIZE * 2
 	tt_win_rec := rl.Rectangle {
@@ -114,7 +123,6 @@ ui_setup :: proc() {
 			i32(path_nodes[i].src_px.y / SRC_TILE_SIZE),
 		)
 		tile_nums[hash] += 1
-		// fmt.printfln("pn:%v hash:%v n:%d", path_nodes[i], hash, tile_nums[hash])
 	}
 }
 
@@ -133,29 +141,28 @@ ui_draw :: proc() {
 		rl.WHITE,
 	)
 
+	// Draw tile outlines
+	for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
+		for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
+			hash := gen_hash(x, y)
+
+			dst := rl.Rectangle {
+				f32(x) * TILE_SIZE + track_tiles.x,
+				f32(y) * TILE_SIZE + track_tiles.y,
+				TILE_SIZE,
+				TILE_SIZE,
+			}
+			rl.DrawRectangleLinesEx(dst, 1, rl.GRAY)
+		}
+	}
+
 	// Draw tile number indicator
 	if game_get_state() == .PLAYING {
-		// TODO:(lukefilewalker) horrendous perf :((((((
-		i := 0
+		// TODO:(lukefilewalker) fix this mess :/
 		for k, v in tile_nums {
-			// Ignore the last tile
-			// if i == len(tile_nums) - 1 {
-			// 	break
-			// }
-			// i += 1
-
 			for x in 0 ..< i32(tileset.width / SRC_TILE_SIZE) {
 				for y in 0 ..< i32(tileset.height / SRC_TILE_SIZE) {
 					hash := gen_hash(x, y)
-
-					// Draw tile outlines
-					dst := rl.Rectangle {
-						f32(x) * TILE_SIZE + track_tiles.x,
-						f32(y) * TILE_SIZE + track_tiles.y,
-						TILE_SIZE,
-						TILE_SIZE,
-					}
-					rl.DrawRectangleLinesEx(dst, 1, rl.GRAY)
 
 					// Draw number of tiles left
 					if v > 0 {
@@ -193,7 +200,7 @@ ui_draw :: proc() {
 				TILE_SIZE,
 				TILE_SIZE,
 			}
-			rl.DrawRectangleLinesEx(dst, 1, rl.RED)
+			rl.DrawRectangleLinesEx(dst, TILE_FOCUS_BORDER_WIDTH, TILE_FOCUS_BORDER_COLOUR)
 		}
 
 		ui_draw_countdown_timer()
@@ -334,6 +341,87 @@ ui_draw_window :: proc(win: Window) {
 	for b in win.buttons {
 		ui_draw_button(b)
 	}
+}
+
+create_confirmation_window :: proc(title, id, content: string) {
+	w_txt := fmt.ctprint(content)
+	w_win_width := f32(rl.MeasureText(w_txt, UI_FONT_SIZE)) - 30
+	w_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
+		y      = f32(400 + WIN_PADDING * 1.5),
+		height = 40 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		width  = w_win_width,
+	}
+
+	w_btns: [dynamic]Button
+	append(
+		&w_btns,
+		ui_new_button(
+			SRC_UI_BORDER_TILE_SIZE,
+			UI_TILE_SIZE + UI_FONT_SIZE * 2,
+			w_win_rec,
+			"Yes ",
+			proc() {game_push_state(.SHUTDOWN)},
+		),
+	)
+	append(
+		&w_btns,
+		ui_new_button(
+			w_btns[0].pos_px.width + SRC_UI_BORDER_TILE_SIZE * 3,
+			UI_TILE_SIZE + UI_FONT_SIZE * 2,
+			w_win_rec,
+			"Cancel",
+			proc() {reset_game()},
+		),
+	)
+
+	w_win := ui_new_window(id, title, w_win_rec, w_txt, w_btns, UI_WINDOW_PADDING, UI_BG_GRAY)
+	w_win.ctrl_buttons.close.on_click = proc() {
+		reset_game()
+	}
+
+	append(&windows, w_win)
+}
+
+// TODO:(claude) tihs is the same as teh confirmation win :(
+create_win_lose_window :: proc(title, id, content: string) {
+	w_win_width: f32 = 210
+	w_win_rec := rl.Rectangle {
+		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
+		y      = f32(400 + WIN_PADDING * 1.5),
+		height = 40 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		width  = w_win_width,
+	}
+	w_txt := fmt.ctprint(content)
+
+	w_btns: [dynamic]Button
+	append(
+		&w_btns,
+		ui_new_button(
+			SRC_UI_BORDER_TILE_SIZE,
+			UI_TILE_SIZE + UI_FONT_SIZE * 2,
+			w_win_rec,
+			"Play Again",
+			proc() {reset_game()},
+		),
+	)
+	append(
+		&w_btns,
+		ui_new_button(
+			w_btns[0].pos_px.width + SRC_UI_BORDER_TILE_SIZE * 3,
+			UI_TILE_SIZE + UI_FONT_SIZE * 2,
+			w_win_rec,
+			"Exit  ",
+			proc() {game_push_state(.EXIT)},
+		),
+	)
+
+	w_win := ui_new_window(id, title, w_win_rec, w_txt, w_btns, UI_WINDOW_PADDING, UI_BG_GRAY)
+	w_win.ctrl_buttons.close.on_click = proc() {
+		game_push_state(.EXIT)
+	}
+
+	append(&windows, w_win)
 }
 
 ui_window_top :: proc(x, y, width: f32, title: string) {
@@ -497,7 +585,7 @@ ui_new_button :: proc(
 		pos_px = {
 			win_rec.x + UI_BUTTON_PADDING + x,
 			win_rec.y + y,
-			f32(w) + UI_BUTTON_PADDING,
+			f32(w),
 			UI_FONT_SIZE + UI_BUTTON_PADDING * 2,
 		},
 		label = label,
@@ -512,7 +600,7 @@ ui_draw_button :: proc(b: Button) {
 
 	rl.DrawRectangleV(pos, size, rl.WHITE)
 	rl.DrawRectangleV(pos + {2, 2}, size, rl.BLACK)
-	rl.DrawRectangleV(pos + {2, 2}, size - {4, 4}, rl.GRAY)
+	rl.DrawRectangleV(pos + {2, 2}, size - {4, 4}, rl.LIGHTGRAY)
 
 	rl.DrawTextEx(
 		font,

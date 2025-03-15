@@ -55,7 +55,6 @@ lookup_tile :: proc(prev, this_tile, next: [2]i32) -> (Direction, Direction) {
 
 check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 	if len(proposed_path) <= 0 {
-		camera_shake_duration = CAMERA_SHAKE_DURATION
 		game_push_state(.GAME_OVER)
 		return
 	}
@@ -69,7 +68,6 @@ check_path :: proc(path: [dynamic]Tile, proposed_path: [dynamic]Tile) {
 			// fmt.printfln("%v - %v", proposed_path[i].type, path[i].type)
 			fmt.printfln("%v\n%v", proposed_path, path)
 
-			camera_shake_duration = CAMERA_SHAKE_DURATION
 			game_push_state(.GAME_OVER)
 			return
 		}

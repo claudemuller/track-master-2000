@@ -8,6 +8,7 @@ GameState :: enum {
 	WIN,
 	GAME_OVER,
 	EXIT,
+	SHUTDOWN,
 }
 
 game_get_state :: proc() -> GameState {
