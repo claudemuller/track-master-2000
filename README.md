@@ -9,6 +9,14 @@ Track Master 2000 is highly advanced train TRAVEL simulation software used by th
 
 Your task is to use the tracks provided to map out a route for the train to reach the town.
 
+## Releases
+
+Releases for Windows, MacOS ARM and Linux can be found [here](https://dxtrs.itch.io/track-master-2000).
+
+- [windows x64](https://dxtrs.itch.io/track-master-2000/purchase)
+- [linux x64](https://dxtrs.itch.io/track-master-2000/purchase)
+- [macos arm64](https://dxtrs.itch.io/track-master-2000/purchase)
+
 ## Requirements
 
 - [odin](https://odin-lang.org/)
