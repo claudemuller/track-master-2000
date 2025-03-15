@@ -117,7 +117,6 @@ setup :: proc() {
 		UI_BG_GRAY,
 	)
 	bg_win.ctrl_buttons.close.on_click = proc() {
-		fmt.println("exting")
 		game_push_state(.EXIT)
 	}
 
@@ -341,8 +340,8 @@ reset_game :: proc() {
 
 	ui_reset()
 
-	game_push_state(.BOOTING)
 	game_push_state(.MAIN_MENU)
+	game_push_state(.PLAYING)
 }
 
 update :: proc() {
@@ -458,11 +457,13 @@ render :: proc() {
 		}
 
 		// Draw mouse hover tile
-		rl.DrawRectangleLinesEx(
-			game_mem.hover_tile.pos_px,
-			TILE_FOCUS_BORDER_WIDTH,
-			TILE_FOCUS_BORDER_COLOUR,
-		)
+		if rl.CheckCollisionPointRec(input.mouse.pos_px, grid.pos_px) {
+			rl.DrawRectangleLinesEx(
+				game_mem.hover_tile.pos_px,
+				TILE_FOCUS_BORDER_WIDTH,
+				TILE_FOCUS_BORDER_COLOUR,
+			)
+		}
 
 		// draw_debug_ui()
 
@@ -473,9 +474,9 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	memctr = rl.GetTime()
-	rl.PlaySound(booting_sound)
-	start_timer(&booting, BOOT_TIME)
+	// memctr = rl.GetTime()
+	// rl.PlaySound(booting_sound)
+	// start_timer(&booting, BOOT_TIME)
 	// game_push_state(.BOOTING)
 	// DEBUG
 	game_push_state(.MAIN_MENU)
