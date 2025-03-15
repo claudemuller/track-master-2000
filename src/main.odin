@@ -195,6 +195,7 @@ reset_game :: proc(level1: bool) {
 	game_mem.selected_tile = {
 		pos_px = {1, 1, 1, 1},
 	}
+	game_mem.show_hint = !game_mem.show_hint
 
 	if level1 {
 		game_mem.path_len = LEVEL_START_LEN
@@ -584,12 +585,12 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	memctr = rl.GetTime()
-	rl.PlaySound(booting_sound)
-	start_timer(&boot_timer, BOOT_TIME)
-	game_push_state(.BOOTING)
+	// memctr = rl.GetTime()
+	// rl.PlaySound(booting_sound)
+	// start_timer(&boot_timer, BOOT_TIME)
+	// game_push_state(.BOOTING)
 	// DEBUG
-	// game_push_state(.MAIN_MENU)
+	game_push_state(.MAIN_MENU)
 	// .DEBUG
 }
 
