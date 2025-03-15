@@ -12,7 +12,7 @@ if "%1"=="" (
 	odin build src -out=build\tm2000.exe
 	del release
 	mkdir release
-	powershell Compress-Archive build\* release\windows.zip
+	powershell Compress-Archive build\* release\windows-x64.zip
 ) else (
 	echo Invalid parameter :/
 )

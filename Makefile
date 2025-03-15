@@ -29,9 +29,9 @@ clean:
 release-linux: release-dir clean
 	odin build ${SRC} -out=build/${BIN}-lin
 	cp -r ./res ./build/
-	zip -r ./release/linux.zip ./build
+	zip -r ./release/linux-x64.zip ./build
 
 release-darwin: release-dir clean
 	odin build ${SRC} -out=build/${BIN}-mac
 	cp -r ./res ./build/
-	zip -r ./release/macos.zip ./build
+	zip -r ./release/macos-arm64.zip ./build
