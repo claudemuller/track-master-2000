@@ -25,11 +25,11 @@ clean:
 	rm -rf ${BIN_DIR}
 
 release-linux: release-dir clean
-	odin build . -out=build/${BIN}-lin
+	odin build ${SRC} -out=build/${BIN}-lin
 	cp -r ./res ./build/
 	zip -r ./release/linux.zip ./build
 
 release-darwin: release-dir clean
-	odin build . -out=build/${BIN}-mac
+	odin build ${SRC} -out=build/${BIN}-mac
 	cp -r ./res ./build/
 	zip -r ./release/macos.zip ./build
