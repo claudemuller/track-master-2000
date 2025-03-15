@@ -203,7 +203,9 @@ ui_draw :: proc() {
 			}
 			rl.DrawRectangleLinesEx(dst, TILE_FOCUS_BORDER_WIDTH, TILE_FOCUS_BORDER_COLOUR)
 		}
+	}
 
+	if game_get_state() == .PLAYING || game_get_state() == .SIMULATING {
 		ui_draw_countdown_timer()
 	}
 }
@@ -629,10 +631,15 @@ ui_draw_button :: proc(b: Button) {
 ui_draw_countdown_timer :: proc() {
 	// Draw countdown
 	countdown_size: i32 = 28
-	countdown_txt := fmt.ctprintf(
-		"Simulation starts in: %d",
-		i32(LEVEL_TIME_LIMIT - get_elapsed(level_timer)) + 1,
-	)
+
+	countdown_txt := fmt.ctprint("Simulating...")
+	if game_get_state() == .PLAYING {
+		countdown_txt = fmt.ctprintf(
+			"Simulation starts in: %d",
+			i32(LEVEL_TIME_LIMIT - get_elapsed(level_timer)) + 1,
+		)
+	}
+
 	txt_w := rl.MeasureText(countdown_txt, countdown_size)
 	txt_h: i32 = 50
 	txt_x := rl.GetScreenWidth() / 2 - txt_w / 2

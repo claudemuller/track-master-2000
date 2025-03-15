@@ -25,10 +25,10 @@ TILE_FOCUS_BORDER_WIDTH :: 2
 TILE_FOCUS_BORDER_COLOUR :: rl.RED
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
-LEVEL_START_LEN :: 10
+LEVEL_START_LEN :: 4
 
 TRAIN_ANIMATION_STEP :: 0.5
-LEVEL_TIME_LIMIT :: 30 // Seconds
+LEVEL_TIME_LIMIT :: 5 // Seconds
 BOOT_TIME :: 10 // Seconds
 
 GameMemory :: struct {
@@ -152,7 +152,7 @@ setup :: proc() {
 	w_txt := fmt.ctprintf(
 		`Welcome
 
-Track Master 2000 is highly advanced train TRAVEL
+Track Master 2000 is highly advanced train travel
 simulation software used by thousands of
 municipalities across the world to ensure the safe
 travel of millions.
@@ -201,9 +201,9 @@ reset_game :: proc(level1: bool) {
 		game_mem.path_len = LEVEL_START_LEN
 		game_mem.level_time_limit = LEVEL_TIME_LIMIT
 	} else {
-		factor := (game_mem.path_len + LEVEL_START_LEN) / LEVEL_START_LEN
+		factor := f32(game_mem.path_len + LEVEL_START_LEN) / LEVEL_START_LEN
 		game_mem.path_len = game_mem.path_len + LEVEL_START_LEN
-		game_mem.level_time_limit = f64(factor) * LEVEL_TIME_LIMIT
+		game_mem.level_time_limit = f64(factor * LEVEL_TIME_LIMIT)
 	}
 	level_timer = Timer{}
 
