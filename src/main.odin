@@ -25,7 +25,7 @@ TILE_FOCUS_BORDER_WIDTH :: 2
 TILE_FOCUS_BORDER_COLOUR :: rl.RED
 DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
-LEVEL_START_LEN :: 4
+LEVEL_START_LEN :: 10
 
 TRAIN_ANIMATION_STEP :: 0.5
 LEVEL_TIME_LIMIT :: 30 // Seconds
@@ -195,7 +195,7 @@ reset_game :: proc(level1: bool) {
 	game_mem.selected_tile = {
 		pos_px = {1, 1, 1, 1},
 	}
-	game_mem.show_hint = !game_mem.show_hint
+	game_mem.show_hint = false
 
 	if level1 {
 		game_mem.path_len = LEVEL_START_LEN
@@ -383,6 +383,14 @@ update :: proc() {
 		if timer_done(boot_timer) {
 			game_push_state(.MAIN_MENU)
 		}
+
+		if .DEL in input.kb.btns {
+			fmt.printfln("del pressed")
+			rl.StopSound(booting_sound)
+			boot_timer = Timer{}
+			game_push_state(.MAIN_MENU)
+		}
+
 		return
 	}
 

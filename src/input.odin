@@ -23,7 +23,7 @@ GamepadButton :: enum {
 }
 
 KeyboardButton :: enum {
-	SPACE,
+	DEL,
 	F1,
 }
 
@@ -82,6 +82,6 @@ input_process :: proc(input: ^Input) {
 	input.kb.axis.y += btof(rl.IsKeyDown(.S)) - btof(rl.IsKeyDown(.W))
 
 	input.kb.btns = {}
-	if rl.IsKeyDown(.SPACE) do input.kb.btns += {.SPACE}
+	if rl.IsKeyPressed(.DELETE) do input.kb.btns += {.DEL}
 	if rl.IsKeyPressed(.F1) do input.kb.btns += {.F1}
 }
