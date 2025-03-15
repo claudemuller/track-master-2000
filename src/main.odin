@@ -7,8 +7,8 @@ import "core:mem"
 import "core:os"
 import rl "vendor:raylib"
 
-NUM_TILES_IN_ROW :: 30
-NUM_TILES_IN_COL :: 17
+NUM_TILES_IN_ROW :: 28
+NUM_TILES_IN_COL :: 16
 
 SCALE :: 2
 SRC_TILE_SIZE :: 32
