@@ -118,7 +118,7 @@ ui_reset :: proc() {
 
 	// Calculate number of available times
 	tile_nums = make(map[u16]i32)
-	for i in 0 ..< len(path_nodes) - 1 {
+	for i in 0 ..< len(path_nodes) {
 		hash := gen_hash(
 			i32(path_nodes[i].src_px.x / SRC_TILE_SIZE),
 			i32(path_nodes[i].src_px.y / SRC_TILE_SIZE),

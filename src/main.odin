@@ -366,8 +366,11 @@ reset_game :: proc(level1: bool) {
 			src_px   = src_px,
 			type     = .TRACK,
 		}
+
 		// grid.tiles[hash] = t
-		append(&path_nodes, t)
+		if i < len(path) - 1 {
+			append(&path_nodes, t)
+		}
 	}
 
 	town_tile := &grid.tiles[hash]
@@ -581,12 +584,12 @@ render :: proc() {
 }
 
 boot_game :: proc() {
-	// memctr = rl.GetTime()
-	// rl.PlaySound(booting_sound)
-	// start_timer(&booting, BOOT_TIME)
-	// game_push_state(.BOOTING)
+	memctr = rl.GetTime()
+	rl.PlaySound(booting_sound)
+	start_timer(&boot_timer, BOOT_TIME)
+	game_push_state(.BOOTING)
 	// DEBUG
-	game_push_state(.MAIN_MENU)
+	// game_push_state(.MAIN_MENU)
 	// .DEBUG
 }
 
