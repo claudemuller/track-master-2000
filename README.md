@@ -3,7 +3,7 @@
 ![screenshot1](screenshot1.png|width=100)
 ![screenshot2](screenshot2.png|width=100)
 ![screenshot3](screenshot3.png|width=100)
-![screenshot4](screenshot4.png|width=100)
+<image src="screenshot4.png" width="100" />
 
 Track Master 2000 is highly advanced train TRAVEL simulation software used by thousands of municipalities across the world to ensure the safe travel of millions.
 
