@@ -27,6 +27,7 @@ DOZE_311_BG_COLOUR :: rl.Color{0, 128, 127, 25}
 NUM_GRASS_TILES :: 4
 LEVEL_START_LEN :: 4
 
+TRAIN_ANIMATION_STEP :: 0.5
 LEVEL_TIME_LIMIT :: 30 // Seconds
 BOOT_TIME :: 10 // Seconds
 
@@ -36,6 +37,7 @@ GameMemory :: struct {
 	path_len:         i32,
 	level_time_limit: f64,
 	state:            [2]GameState,
+	show_hint:        bool,
 }
 
 Train :: struct {
@@ -49,8 +51,9 @@ Train :: struct {
 game_mem: GameMemory
 input: Input
 camera_shake_duration: f32
-level_end: Timer
-booting: Timer
+level_timer: Timer
+boot_timer: Timer
+train_timer: Timer
 booting_sound: rl.Sound
 memctr: f64
 bg_win: Window
@@ -143,7 +146,7 @@ setup :: proc() {
 	w_win_rec := rl.Rectangle {
 		x      = f32(rl.GetScreenWidth() / 2) - w_win_width / 2 - WIN_PADDING * 2,
 		y      = f32(300 + WIN_PADDING * 1.5),
-		height = 300 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
+		height = 340 + UI_BOTTOM_BORDER_TILE_SIZE + UI_TILE_SIZE + UI_HORIZONTAL_RULE_SIZE + UI_BUTTON_SIZE,
 		width  = w_win_width,
 	}
 	w_txt := fmt.ctprintf(
@@ -159,6 +162,8 @@ a route for the train to reach the town. You have
 %.1f minutes to complete the task after which the
 simulation will begin. Alternatively, click
 the SIMULATE button to run the simulation early.
+
+You can press F1 to toggle hints.
 
 Good luck`,
 		game_mem.level_time_limit / 60,
@@ -199,7 +204,7 @@ reset_game :: proc(level1: bool) {
 		game_mem.path_len = game_mem.path_len + LEVEL_START_LEN
 		game_mem.level_time_limit = f64(factor) * LEVEL_TIME_LIMIT
 	}
-	level_end = Timer{}
+	level_timer = Timer{}
 
 	tot_num_tiles := NUM_TILES_IN_ROW * NUM_TILES_IN_COL
 	grid = {
@@ -361,7 +366,7 @@ reset_game :: proc(level1: bool) {
 			src_px   = src_px,
 			type     = .TRACK,
 		}
-		grid.tiles[hash] = t
+		// grid.tiles[hash] = t
 		append(&path_nodes, t)
 	}
 
@@ -376,7 +381,7 @@ reset_game :: proc(level1: bool) {
 
 update :: proc() {
 	if game_get_state() == .BOOTING {
-		if timer_done(booting) {
+		if timer_done(boot_timer) {
 			game_push_state(.MAIN_MENU)
 		}
 		return
@@ -399,8 +404,12 @@ update :: proc() {
 	case .MAIN_MENU:
 
 	case .PLAYING:
+		if .F1 in input.kb.btns {
+			game_mem.show_hint = !game_mem.show_hint
+		}
+
 		if game_get_prev_state() == .MAIN_MENU {
-			start_timer(&level_end, game_mem.level_time_limit)
+			start_timer(&level_timer, game_mem.level_time_limit)
 			// Push PLAYING to drop MAIN_MENU for next frame
 			game_push_state(.PLAYING)
 		}
@@ -408,7 +417,7 @@ update :: proc() {
 		update_grid()
 
 		// Level time is up, check path
-		if timer_done(level_end) {
+		if timer_done(level_timer) {
 			game_push_state(.SIMULATING)
 		}
 
@@ -418,15 +427,40 @@ update :: proc() {
 			return
 		}
 
+		if !timer_done(train_timer) {
+			break
+		}
+
 		if proposed_node_idx < len(proposed_path) {
 			correct_nodes += check_path(path_nodes, proposed_path[proposed_node_idx])
 
-			train.pos_grid = proposed_path[proposed_node_idx].pos_grid
-			train.pos_px = proposed_path[proposed_node_idx].pos_px
-			train.src_px = {0, 0, SRC_TILE_SIZE, SRC_TILE_SIZE}
-			train.direction = .DOWN
+			tile := proposed_path[proposed_node_idx]
+			train.pos_grid = tile.pos_grid
+			train.pos_px.x = path_nodes[proposed_node_idx].pos_px.x
+			train.pos_px.y = path_nodes[proposed_node_idx].pos_px.y
+			train.pos_px.width = TILE_SIZE
+			train.pos_px.height = TILE_SIZE
+			train.src_px.width = SRC_TILE_SIZE
+			train.src_px.height = SRC_TILE_SIZE
+
+			p :=
+				rl.Vector2{f32(path[proposed_node_idx].x), f32(path[proposed_node_idx].y)} -
+				tile.pos_grid
+			if p.x > 0 {
+				train.src_px.x = 0
+			} else if p.x < 0 {
+				train.src_px.x = 1 * SRC_TILE_SIZE
+			} else if p.y > 0 {
+				train.src_px.x = 2 * SRC_TILE_SIZE
+			} else if p.y < 0 {
+				train.src_px.x = 3 * SRC_TILE_SIZE
+			}
+
+			fmt.printfln("%v\n%v\n", tile, path[proposed_node_idx])
 
 			proposed_node_idx += 1
+
+			start_timer(&train_timer, TRAIN_ANIMATION_STEP)
 		} else {
 			if correct_nodes == len(path) - 1 {
 				game_push_state(.WIN)
@@ -474,7 +508,8 @@ render :: proc() {
 			// }
 
 			// TODO:(claude) this is ugly
-			if game_get_state() == .PLAYING ||
+			if game_get_state() == .SIMULATING ||
+			   game_get_state() == .PLAYING ||
 			   game_get_state() == .WIN ||
 			   game_get_state() == .GAME_OVER {
 				switch t.type {
@@ -511,7 +546,20 @@ render :: proc() {
 			}
 		}
 
-		if game_get_state() == .SIMULATING || game_get_state() == .PLAYING {
+		if game_mem.show_hint && game_get_state() == .PLAYING {
+			for p in path_nodes {
+				rl.DrawTexturePro(
+					tileset,
+					p.src_px,
+					p.pos_px,
+					{0, 0},
+					0,
+					rl.WHITE - {0, 0, 0, 100},
+				)
+			}
+		}
+
+		if game_get_state() == .SIMULATING {
 			rl.DrawTexturePro(train.texture, train.src_px, train.pos_px, {0, 0}, 0, rl.WHITE)
 		}
 

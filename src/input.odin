@@ -24,6 +24,7 @@ GamepadButton :: enum {
 
 KeyboardButton :: enum {
 	SPACE,
+	F1,
 }
 
 Input :: struct {
@@ -82,4 +83,5 @@ input_process :: proc(input: ^Input) {
 
 	input.kb.btns = {}
 	if rl.IsKeyDown(.SPACE) do input.kb.btns += {.SPACE}
+	if rl.IsKeyPressed(.F1) do input.kb.btns += {.F1}
 }

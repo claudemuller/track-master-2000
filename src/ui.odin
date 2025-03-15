@@ -633,7 +633,7 @@ ui_draw_countdown_timer :: proc() {
 	countdown_size: i32 = 28
 	countdown_txt := fmt.ctprintf(
 		"Simulation starts in: %d",
-		i32(LEVEL_TIME_LIMIT - get_elapsed(level_end)) + 1,
+		i32(LEVEL_TIME_LIMIT - get_elapsed(level_timer)) + 1,
 	)
 	txt_w := rl.MeasureText(countdown_txt, countdown_size)
 	txt_h: i32 = 50
